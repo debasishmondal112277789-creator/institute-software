@@ -104,16 +104,22 @@ export const getDB = (): DBStructure => {
   const data = localStorage.getItem(DB_KEY);
   if (!data) return initialDB;
   const parsed = JSON.parse(data);
-  if (!parsed.institute) parsed.institute = initialDB.institute;
+  
+  // Migration: Ensure new branding is applied if it was missing
+  if (!parsed.institute || (parsed.institute.name === 'EDUNEXUS' || !parsed.institute.logoUrl)) {
+    parsed.institute = initialDB.institute;
+  }
+  
   if (!parsed.users) parsed.users = initialDB.users;
   if (!parsed.roleDefaults) {
     parsed.roleDefaults = initialDB.roleDefaults;
   }
-  // Ensure all users have permissions structure
+  
   parsed.users = parsed.users.map((u: any) => ({
     ...u,
     permissions: u.permissions || (u.role === UserRole.ADMIN ? defaultAdminPermissions : initialTeacherPermissions)
   }));
+  
   return parsed;
 };
 

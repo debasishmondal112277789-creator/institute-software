@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Student, Payment } from '../types';
+import { Student, Payment, Institute } from '../types';
 import { formatCurrency, numberToWords } from '../utils/formatters';
 
 interface ReceiptProps {
@@ -8,13 +8,15 @@ interface ReceiptProps {
   student: Student;
   instituteName?: string;
   instituteAddress?: string;
+  logoUrl?: string;
 }
 
 const Receipt: React.FC<ReceiptProps> = ({ 
   payment, 
   student, 
   instituteName = "SKILLOPEDIA",
-  instituteAddress = "Premium Campus, Skillopedia Heights, City Center"
+  instituteAddress = "Premium Campus, Skillopedia Heights, City Center",
+  logoUrl
 }) => {
   return (
     <div className="bg-white p-10 border-[12px] border-double border-[#2d5a8e] w-[850px] mx-auto text-gray-900 shadow-2xl relative overflow-hidden print:m-0 print:border-[6px] print:shadow-none">
@@ -24,22 +26,26 @@ const Receipt: React.FC<ReceiptProps> = ({
       {/* Header Section */}
       <div className="flex justify-between items-start mb-8 pb-6 border-b-2 border-gray-100">
         <div className="flex gap-4">
-          {/* Stylized Logo Representation */}
-          <div className="relative w-20 h-20 flex-shrink-0">
-            <div className="absolute inset-0 bg-[#2d5a8e] rounded-2xl rotate-3 shadow-lg"></div>
-            <div className="absolute inset-0 bg-white border-2 border-[#2d5a8e] rounded-2xl -rotate-3 flex items-center justify-center">
-               <div className="text-center">
-                 <div className="flex justify-center gap-0.5 mb-1">
-                   <div className="w-1.5 h-1.5 rounded-full bg-[#9dc84a]"></div>
-                   <div className="w-1.5 h-1.5 rounded-full bg-[#9dc84a]"></div>
-                   <div className="w-1.5 h-1.5 rounded-full bg-[#9dc84a]"></div>
+          {/* Logo Container */}
+          <div className="relative w-24 h-24 flex-shrink-0">
+            <div className="absolute inset-0 bg-[#2d5a8e]/10 rounded-2xl rotate-3 shadow-sm border border-[#2d5a8e]/20"></div>
+            <div className="absolute inset-0 bg-white border-2 border-[#2d5a8e]/30 rounded-2xl -rotate-3 flex items-center justify-center overflow-hidden p-2">
+               {logoUrl ? (
+                 <img src={logoUrl} className="w-full h-full object-contain" alt="Institute Logo" />
+               ) : (
+                 <div className="text-center">
+                   <div className="flex justify-center gap-0.5 mb-1">
+                     <div className="w-1.5 h-1.5 rounded-full bg-[#9dc84a]"></div>
+                     <div className="w-1.5 h-1.5 rounded-full bg-[#9dc84a]"></div>
+                     <div className="w-1.5 h-1.5 rounded-full bg-[#9dc84a]"></div>
+                   </div>
+                   <i className="fas fa-university text-[#2d5a8e] text-3xl"></i>
                  </div>
-                 <i className="fas fa-user-graduate text-[#2d5a8e] text-3xl"></i>
-               </div>
+               )}
             </div>
           </div>
           
-          <div>
+          <div className="ml-2">
             <h1 className="text-4xl font-black tracking-tighter text-[#2d5a8e] leading-none uppercase">
               {instituteName}
             </h1>
@@ -164,7 +170,7 @@ const Receipt: React.FC<ReceiptProps> = ({
         <div className="text-center w-80">
           <div className="relative h-20 flex flex-col items-center justify-center mb-2">
             <div className="absolute top-0 opacity-10 scale-150 rotate-12">
-               <i className="fas fa-certificate text-6xl text-[#2d5a8e]"></i>
+               {logoUrl ? <img src={logoUrl} className="w-16 h-16 object-contain" /> : <i className="fas fa-certificate text-6xl text-[#2d5a8e]"></i>}
             </div>
             <p className="text-[10px] font-black text-[#2d5a8e] uppercase tracking-widest leading-none">Skillopedia Institute</p>
             <p className="text-[8px] font-bold text-gray-400 mt-1 italic">Authorized Academic Seal</p>
@@ -177,7 +183,7 @@ const Receipt: React.FC<ReceiptProps> = ({
       
       {/* Footer Info */}
       <div className="mt-16 pt-6 border-t border-gray-100 flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-        <div>Generated via Skillopedia ERP Pro v1.0.4</div>
+        <div>Generated via {instituteName} ERP Pro v1.0.4</div>
         <div className="flex gap-4">
           <span>Official Document</span>
           <span className="text-[#9dc84a]">Secured Record</span>
@@ -186,7 +192,7 @@ const Receipt: React.FC<ReceiptProps> = ({
       
       {/* Brand Watermark */}
       <div className="absolute -bottom-10 -right-10 opacity-[0.03] rotate-12 pointer-events-none">
-        <i className="fas fa-university text-[300px]"></i>
+        {logoUrl ? <img src={logoUrl} className="w-[300px] h-[300px] object-contain" /> : <i className="fas fa-university text-[300px]"></i>}
       </div>
     </div>
   );
