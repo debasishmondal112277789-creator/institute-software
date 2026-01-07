@@ -4,6 +4,7 @@ import { User, UserRole, Student, Teacher, Batch, Payment, Attendance, PaymentMo
 import { getDB, saveDB, generateStudentId, generateReceiptNo, backupDB } from './services/db';
 import { formatCurrency } from './utils/formatters';
 import Receipt from './components/Receipt';
+import AdmissionModal from './components/AdmissionModal';
 
 // --- Sub-Components ---
 
@@ -39,6 +40,8 @@ export default function App() {
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [printingPayment, setPrintingPayment] = useState<{payment: Payment, student: Student} | null>(null);
+  const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   // Persistence
   useEffect(() => {
@@ -65,14 +68,35 @@ export default function App() {
   };
 
   // Student Methods
-  const addStudent = (formData: any) => {
-    const newStudent: Student = {
-      ...formData,
-      id: generateStudentId(),
-      status: 'Active',
-      admissionDate: new Date().toISOString().split('T')[0]
-    };
-    setDb(prev => ({ ...prev, students: [...prev.students, newStudent] }));
+  const handleAdmissionSubmit = (formData: any) => {
+    if (editingStudent) {
+      // Update existing
+      setDb(prev => ({
+        ...prev,
+        students: prev.students.map(s => s.id === editingStudent.id ? { ...s, ...formData } : s)
+      }));
+      setEditingStudent(null);
+    } else {
+      // Add new
+      const newStudent: Student = {
+        ...formData,
+        id: generateStudentId(),
+        status: 'Active',
+        admissionDate: formData.admissionDate || new Date().toISOString().split('T')[0]
+      };
+      setDb(prev => ({ ...prev, students: [...prev.students, newStudent] }));
+    }
+    setIsAdmissionModalOpen(false);
+  };
+
+  const openEditStudent = (student: Student) => {
+    setEditingStudent(student);
+    setIsAdmissionModalOpen(true);
+  };
+
+  const openNewAdmission = () => {
+    setEditingStudent(null);
+    setIsAdmissionModalOpen(true);
   };
 
   // Teacher Methods
@@ -213,6 +237,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
+      <AdmissionModal 
+        isOpen={isAdmissionModalOpen} 
+        onClose={() => { setIsAdmissionModalOpen(false); setEditingStudent(null); }} 
+        onSubmit={handleAdmissionSubmit} 
+        batches={db.batches}
+        initialData={editingStudent}
+      />
+
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-blue-900 flex-shrink-0 shadow-2xl z-20">
         <div className="p-6 flex items-center gap-3 border-b border-blue-800">
@@ -284,9 +316,12 @@ export default function App() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                  <i className="fas fa-history text-blue-500"></i> Recent Admissions
-                </h4>
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                    <i className="fas fa-history text-blue-500"></i> Recent Admissions
+                  </h4>
+                  <button onClick={() => setActiveTab('students')} className="text-blue-600 text-sm font-bold hover:underline">View All</button>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="text-left bg-gray-50">
@@ -363,18 +398,10 @@ export default function App() {
                  />
               </div>
               <button 
-                onClick={() => {
-                  const name = prompt('Student Name:');
-                  const mobile = prompt('Mobile Number:');
-                  const course = prompt('Course Name:');
-                  const totalFees = Number(prompt('Total Fees Amount:', '10000'));
-                  if(name && mobile && course) {
-                    addStudent({ name, mobile, course, totalFees, batchId: db.batches[0]?.id || '' });
-                  }
-                }}
+                onClick={openNewAdmission}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center gap-2"
               >
-                <i className="fas fa-plus"></i> New Admission
+                <i className="fas fa-plus"></i> New Admission Form
               </button>
             </div>
 
@@ -407,7 +434,13 @@ export default function App() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i className="fas fa-edit"></i></button>
+                          <button 
+                            onClick={() => openEditStudent(s)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            title="Edit Student"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
                           <button 
                             onClick={() => {
                               setDb(prev => ({
@@ -416,6 +449,7 @@ export default function App() {
                               }));
                             }}
                             className={`p-2 rounded-lg ${s.status === 'Active' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                            title={s.status === 'Active' ? 'Deactivate' : 'Activate'}
                           >
                             <i className={s.status === 'Active' ? 'fas fa-user-slash' : 'fas fa-user-check'}></i>
                           </button>
@@ -431,7 +465,8 @@ export default function App() {
             </div>
           </div>
         )}
-
+        
+        {/* Rest of Tabs... */}
         {activeTab === 'teachers' && (
           <div className="animate-in fade-in duration-500">
             <div className="flex justify-between items-center mb-6">
