@@ -12,12 +12,14 @@ interface AdmissionModalProps {
 
 const AdmissionModal: React.FC<AdmissionModalProps> = ({ isOpen, onClose, onSubmit, batches, initialData }) => {
   const [isDirty, setIsDirty] = useState(false);
+  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Reset dirty state when modal opens or initialData changes
+  // Reset state when modal opens or initialData changes
   useEffect(() => {
     if (isOpen) {
       setIsDirty(false);
+      setStatus(initialData?.status || 'Active');
     }
   }, [isOpen, initialData]);
 
@@ -37,7 +39,8 @@ const AdmissionModal: React.FC<AdmissionModalProps> = ({ isOpen, onClose, onSubm
     const data = Object.fromEntries(formData.entries());
     onSubmit({
       ...data,
-      totalFees: Number(data.totalFees)
+      totalFees: Number(data.totalFees),
+      status: status
     });
     setIsDirty(false); 
     onClose();
@@ -72,6 +75,30 @@ const AdmissionModal: React.FC<AdmissionModalProps> = ({ isOpen, onClose, onSubm
           onChange={handleFormChange}
           className="p-8 overflow-y-auto space-y-6"
         >
+          {/* Status Selection */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Enrollment Status</p>
+              <p className="text-xs text-gray-500 font-medium">Set student current activity state</p>
+            </div>
+            <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+              <button
+                type="button"
+                onClick={() => { setStatus('Active'); setIsDirty(true); }}
+                className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${status === 'Active' ? 'bg-green-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStatus('Inactive'); setIsDirty(true); }}
+                className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${status === 'Inactive' ? 'bg-red-500 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                Inactive
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase">Full Name *</label>

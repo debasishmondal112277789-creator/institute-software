@@ -107,7 +107,7 @@ export default function App() {
       const newStudent: Student = {
         ...formData,
         id: generateStudentId(),
-        status: 'Active',
+        status: formData.status || 'Active',
         admissionDate: formData.admissionDate || new Date().toISOString().split('T')[0]
       };
       setDb(prev => ({ ...prev, students: [...prev.students, newStudent] }));
@@ -179,6 +179,15 @@ export default function App() {
   const openNewBatch = () => {
     setEditingBatch(null);
     setIsBatchModalOpen(true);
+  };
+
+  const deleteBatch = (id: string) => {
+    if (confirm('Are you sure you want to remove this batch? Associated students will need to be re-assigned.')) {
+      setDb(prev => ({
+        ...prev,
+        batches: prev.batches.filter(b => b.id !== id)
+      }));
+    }
   };
 
   const addPayment = (formData: any) => {
@@ -615,7 +624,7 @@ export default function App() {
                     <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Faculty Mentor</th>
                     <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Schedule (Timing)</th>
                     <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Count</th>
-                    <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Options</th>
+                    <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Management</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -634,14 +643,30 @@ export default function App() {
                         <span className="bg-blue-50 text-[#2d5a8e] font-black px-3 py-1 rounded-lg text-sm">{db.students.filter(s => s.batchId === b.id).length}</span>
                       </td>
                       <td className="p-5 text-right">
-                        <button 
-                          onClick={() => openEditBatch(b)} 
-                          className="text-[#2d5a8e] hover:bg-blue-50 p-2.5 rounded-xl transition-all flex items-center gap-2 ml-auto"
-                          title="Reschedule / Edit Batch"
-                        >
-                          <i className="fas fa-calendar-alt"></i>
-                          <span className="text-xs font-black uppercase">Reschedule</span>
-                        </button>
+                        <div className="flex justify-end gap-2">
+                           <button 
+                            onClick={() => openEditBatch(b)} 
+                            className="w-9 h-9 flex items-center justify-center text-[#2d5a8e] bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
+                            title="Edit Batch Details"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                           <button 
+                            onClick={() => openEditBatch(b)} 
+                            className="text-emerald-600 hover:bg-emerald-50 px-3 py-2 rounded-xl transition-all flex items-center gap-2"
+                            title="Reschedule / Calendar View"
+                          >
+                            <i className="fas fa-calendar-alt"></i>
+                            <span className="text-[10px] font-black uppercase">Reschedule</span>
+                          </button>
+                           <button 
+                            onClick={() => deleteBatch(b.id)} 
+                            className="w-9 h-9 flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                            title="Delete Batch"
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
