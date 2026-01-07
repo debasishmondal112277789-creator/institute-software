@@ -1,7 +1,40 @@
 
-import { Student, Teacher, Batch, Payment, Attendance, User, UserRole } from '../types';
+import { Student, Teacher, Batch, Payment, Attendance, User, UserRole, Institute, UserPermissions } from '../types';
 
 const DB_KEY = 'EDUNEXUS_ERP_DB';
+
+export const defaultAdminPermissions: UserPermissions = {
+  dashboard: true,
+  students: true,
+  teachers: true,
+  batches: true,
+  attendance: true,
+  fees: true,
+  reports: true,
+  settings: true
+};
+
+export const initialTeacherPermissions: UserPermissions = {
+  dashboard: true,
+  students: true,
+  teachers: false,
+  batches: true,
+  attendance: true,
+  fees: false,
+  reports: false,
+  settings: false
+};
+
+export const initialStudentPermissions: UserPermissions = {
+  dashboard: true,
+  students: false,
+  teachers: false,
+  batches: false,
+  attendance: false,
+  fees: true,
+  reports: false,
+  settings: false
+};
 
 interface DBStructure {
   students: Student[];
@@ -10,6 +43,11 @@ interface DBStructure {
   payments: Payment[];
   attendance: Attendance[];
   users: User[];
+  institute: Institute;
+  roleDefaults: {
+    [UserRole.TEACHER]: UserPermissions;
+    [UserRole.STUDENT]: UserPermissions;
+  };
   meta: {
     lastReceiptNo: number;
     lastStudentId: number;
@@ -27,9 +65,35 @@ const initialDB: DBStructure = {
   payments: [],
   attendance: [],
   users: [
-    { id: 'U1', username: 'admin', role: UserRole.ADMIN, name: 'Main Admin' },
-    { id: 'U2', username: 'teacher', role: UserRole.TEACHER, name: 'Prof. John' }
+    { 
+      id: 'U1', 
+      username: 'admin', 
+      password: 'admin123', 
+      role: UserRole.ADMIN, 
+      name: 'Main Admin',
+      permissions: defaultAdminPermissions
+    },
+    { 
+      id: 'U2', 
+      username: 'teacher', 
+      password: 'teacher123', 
+      role: UserRole.TEACHER, 
+      name: 'Prof. John',
+      permissions: initialTeacherPermissions
+    }
   ],
+  institute: {
+    name: 'SKILLOPEDIA',
+    tagline: 'Personality Development Institute',
+    address: 'Premium Campus, Skillopedia Heights, City Center',
+    phone: '+91 8509642898',
+    email: 'skillopedia.institute@gmail.com',
+    logoUrl: 'https://i.ibb.co/VYv0HhMh/skillopedia-logo.png'
+  },
+  roleDefaults: {
+    [UserRole.TEACHER]: initialTeacherPermissions,
+    [UserRole.STUDENT]: initialStudentPermissions
+  },
   meta: {
     lastReceiptNo: 1000,
     lastStudentId: 100
@@ -38,7 +102,19 @@ const initialDB: DBStructure = {
 
 export const getDB = (): DBStructure => {
   const data = localStorage.getItem(DB_KEY);
-  return data ? JSON.parse(data) : initialDB;
+  if (!data) return initialDB;
+  const parsed = JSON.parse(data);
+  if (!parsed.institute) parsed.institute = initialDB.institute;
+  if (!parsed.users) parsed.users = initialDB.users;
+  if (!parsed.roleDefaults) {
+    parsed.roleDefaults = initialDB.roleDefaults;
+  }
+  // Ensure all users have permissions structure
+  parsed.users = parsed.users.map((u: any) => ({
+    ...u,
+    permissions: u.permissions || (u.role === UserRole.ADMIN ? defaultAdminPermissions : initialTeacherPermissions)
+  }));
+  return parsed;
 };
 
 export const saveDB = (db: DBStructure) => {

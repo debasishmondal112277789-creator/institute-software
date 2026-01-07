@@ -1,13 +1,34 @@
 
 export enum UserRole {
   ADMIN = 'ADMIN',
-  TEACHER = 'TEACHER'
+  TEACHER = 'TEACHER',
+  STUDENT = 'STUDENT'
 }
 
 export enum PaymentMode {
   CASH = 'CASH',
   UPI = 'UPI/ONLINE',
   CHEQUE = 'CHEQUE'
+}
+
+export interface UserPermissions {
+  dashboard: boolean;
+  students: boolean;
+  teachers: boolean;
+  batches: boolean;
+  attendance: boolean;
+  fees: boolean;
+  reports: boolean;
+  settings: boolean;
+}
+
+export interface Institute {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  tagline: string;
+  logoUrl?: string;
 }
 
 export interface Student {
@@ -62,6 +83,9 @@ export interface Attendance {
 export interface User {
   id: string;
   username: string;
+  password?: string;
   role: UserRole;
   name: string;
+  permissions: UserPermissions;
+  linkedEntityId?: string; // Student ID or Teacher ID
 }
