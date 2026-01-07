@@ -1,0 +1,7 @@
+{
+  "name": "EduNexus ERP Pro",
+  "description": "A commercial-grade, offline-first Institute ERP for managing students, teachers, attendance, and professional fee receipts.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
