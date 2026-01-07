@@ -71,6 +71,9 @@ export default function App() {
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
 
+  // Batch Detail State
+  const [viewingBatchId, setViewingBatchId] = useState<string | null>(null);
+
   // Persistence
   useEffect(() => {
     saveDB(db);
@@ -187,6 +190,7 @@ export default function App() {
         ...prev,
         batches: prev.batches.filter(b => b.id !== id)
       }));
+      if (viewingBatchId === id) setViewingBatchId(null);
     }
   };
 
@@ -241,6 +245,15 @@ export default function App() {
       b.course.toLowerCase().includes(batchSearch.toLowerCase()) ||
       teacherName.toLowerCase().includes(batchSearch.toLowerCase());
   }), [db.batches, db.teachers, batchSearch]);
+
+  // Derived Viewing Batch Data
+  const currentViewingBatch = useMemo(() => 
+    db.batches.find(b => b.id === viewingBatchId) || null
+  , [db.batches, viewingBatchId]);
+
+  const studentsInViewingBatch = useMemo(() => 
+    db.students.filter(s => s.batchId === viewingBatchId)
+  , [db.students, viewingBatchId]);
 
   if (printingPayment) {
     return (
@@ -602,80 +615,144 @@ export default function App() {
 
         {activeTab === 'batches' && (
           <div className="animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-              <SearchBar 
-                value={batchSearch} 
-                onChange={setBatchSearch} 
-                placeholder="Search Batch by Name, Course or Teacher..." 
-              />
-              <button 
-                onClick={openNewBatch}
-                className="bg-[#2d5a8e] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg flex items-center gap-2 transition-all"
-              >
-                <i className="fas fa-layer-group"></i> Create Learning Group
-              </button>
-            </div>
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Batch Name</th>
-                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Course Module</th>
-                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Faculty Mentor</th>
-                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Schedule (Timing)</th>
-                    <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Count</th>
-                    <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Management</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredBatches.map(b => (
-                    <tr key={b.id} className="hover:bg-gray-50/50">
-                      <td className="p-5 font-black text-gray-800">{b.name}</td>
-                      <td className="p-5 text-gray-600 font-medium">{b.course}</td>
-                      <td className="p-5 font-bold text-[#2d5a8e]">{db.teachers.find(t => t.id === b.teacherId)?.name || 'Unassigned'}</td>
-                      <td className="p-5">
-                        <div className="flex items-center gap-2 text-[#9dc84a] font-black text-sm">
-                          <i className="fas fa-clock"></i>
-                          {b.timing}
-                        </div>
-                      </td>
-                      <td className="p-5 text-center">
-                        <span className="bg-blue-50 text-[#2d5a8e] font-black px-3 py-1 rounded-lg text-sm">{db.students.filter(s => s.batchId === b.id).length}</span>
-                      </td>
-                      <td className="p-5 text-right">
-                        <div className="flex justify-end gap-2">
-                           <button 
-                            onClick={() => openEditBatch(b)} 
-                            className="w-9 h-9 flex items-center justify-center text-[#2d5a8e] bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
-                            title="Edit Batch Details"
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                           <button 
-                            onClick={() => openEditBatch(b)} 
-                            className="text-emerald-600 hover:bg-emerald-50 px-3 py-2 rounded-xl transition-all flex items-center gap-2"
-                            title="Reschedule / Calendar View"
-                          >
-                            <i className="fas fa-calendar-alt"></i>
-                            <span className="text-[10px] font-black uppercase">Reschedule</span>
-                          </button>
-                           <button 
-                            onClick={() => deleteBatch(b.id)} 
-                            className="w-9 h-9 flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
-                            title="Delete Batch"
-                          >
-                            <i className="fas fa-trash-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredBatches.length === 0 && (
-                    <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-medium italic">No batches match your search.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {viewingBatchId ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setViewingBatchId(null)}
+                      className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50 shadow-sm"
+                    >
+                      <i className="fas fa-chevron-left"></i>
+                    </button>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800">{currentViewingBatch?.name}</h3>
+                      <p className="text-xs text-[#2d5a8e] font-black uppercase tracking-widest">Batch Members Directory</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                    <p className="text-sm font-bold text-gray-600">
+                      Total Enrolled: <span className="text-[#2d5a8e]">{studentsInViewingBatch.length}</span>
+                    </p>
+                  </div>
+                  <table className="w-full">
+                    <thead className="bg-white border-b">
+                      <tr>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Student ID</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Contact</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                        <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {studentsInViewingBatch.map(s => (
+                        <tr key={s.id} className="hover:bg-gray-50/30">
+                          <td className="p-4 font-mono text-sm font-black text-[#2d5a8e]">{s.id}</td>
+                          <td className="p-4 font-bold text-gray-700">{s.name}</td>
+                          <td className="p-4 text-sm text-gray-500">{s.mobile}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <button 
+                              onClick={() => openEditStudent(s)}
+                              className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all"
+                            >
+                              Edit Profile
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {studentsInViewingBatch.length === 0 && (
+                        <tr><td colSpan={5} className="p-12 text-center text-gray-400 italic">No students assigned to this batch yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+                  <SearchBar 
+                    value={batchSearch} 
+                    onChange={setBatchSearch} 
+                    placeholder="Search Batch by Name, Course or Teacher..." 
+                  />
+                  <button 
+                    onClick={openNewBatch}
+                    className="bg-[#2d5a8e] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg flex items-center gap-2 transition-all"
+                  >
+                    <i className="fas fa-layer-group"></i> Create Learning Group
+                  </button>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Batch Name</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Course Module</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Faculty Mentor</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Schedule (Timing)</th>
+                        <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Count</th>
+                        <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Management</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredBatches.map(b => (
+                        <tr key={b.id} className="hover:bg-gray-50/50">
+                          <td className="p-5 font-black text-gray-800">{b.name}</td>
+                          <td className="p-5 text-gray-600 font-medium">{b.course}</td>
+                          <td className="p-5 font-bold text-[#2d5a8e]">{db.teachers.find(t => t.id === b.teacherId)?.name || 'Unassigned'}</td>
+                          <td className="p-5">
+                            <div className="flex items-center gap-2 text-[#9dc84a] font-black text-sm">
+                              <i className="fas fa-clock"></i>
+                              {b.timing}
+                            </div>
+                          </td>
+                          <td className="p-5 text-center">
+                            <span className="bg-blue-50 text-[#2d5a8e] font-black px-3 py-1 rounded-lg text-sm">{db.students.filter(s => s.batchId === b.id).length}</span>
+                          </td>
+                          <td className="p-5 text-right">
+                            <div className="flex justify-end gap-2">
+                               <button 
+                                onClick={() => setViewingBatchId(b.id)} 
+                                className="w-9 h-9 flex items-center justify-center text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
+                                title="View Students in Batch"
+                              >
+                                <i className="fas fa-users"></i>
+                              </button>
+                               <button 
+                                onClick={() => openEditBatch(b)} 
+                                className="w-9 h-9 flex items-center justify-center text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all"
+                                title="Edit Batch Details / Reschedule"
+                              >
+                                <i className="fas fa-calendar-alt"></i>
+                              </button>
+                               <button 
+                                onClick={() => deleteBatch(b.id)} 
+                                className="w-9 h-9 flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                                title="Delete Batch"
+                              >
+                                <i className="fas fa-trash-alt"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredBatches.length === 0 && (
+                        <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-medium italic">No batches match your search.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
 
