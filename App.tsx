@@ -18,18 +18,18 @@ const SidebarItem = ({ icon, label, active, onClick, hidden }: { icon: string, l
       className={`w-full flex items-center gap-3 px-6 py-4 transition-all ${active ? 'bg-[#2d5a8e] text-white shadow-lg z-10' : 'text-blue-100 hover:bg-[#1e3c5f]'}`}
     >
       <i className={`fas ${icon} w-6`}></i>
-      <span className="font-medium">{label}</span>
+      <span className="font-medium text-sm">{label}</span>
     </button>
   );
 };
 
 const Card = ({ title, value, icon, color }: { title: string, value: string | number, icon: string, color: string }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between">
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between transition-transform hover:scale-[1.02]">
     <div>
-      <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">{title}</p>
-      <h3 className="text-3xl font-bold text-gray-800 mt-1">{value}</h3>
+      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{title}</p>
+      <h3 className="text-3xl font-black text-gray-800 mt-1">{value}</h3>
     </div>
-    <div className={`${color} w-14 h-14 rounded-full flex items-center justify-center text-white text-xl shadow-inner`}>
+    <div className={`${color} w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg`}>
       <i className={`fas ${icon}`}></i>
     </div>
   </div>
@@ -45,14 +45,6 @@ const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: 
       value={value}
       onChange={e => onChange(e.target.value)}
     />
-    {value && (
-      <button 
-        onClick={() => onChange('')}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-      >
-        <i className="fas fa-times-circle"></i>
-      </button>
-    )}
   </div>
 );
 
@@ -61,9 +53,10 @@ const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [settingsSubTab, setSettingsSubTab] = useState<'profile' | 'users' | 'templates'>('profile');
   const [db, setDb] = useState(getDB());
   
-  // Search States
+  // Search & Filters
   const [studentSearch, setStudentSearch] = useState('');
   const [teacherSearch, setTeacherSearch] = useState('');
   const [batchSearch, setBatchSearch] = useState('');
@@ -72,25 +65,16 @@ export default function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [printingPayment, setPrintingPayment] = useState<{payment: Payment, student: Student} | null>(null);
   
-  // Modals States
+  // Modals & Editing
   const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
-
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
-
-  // Batch Detail State
   const [viewingBatchId, setViewingBatchId] = useState<string | null>(null);
-
-  // User Management State
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const userFormRef = useRef<HTMLFormElement>(null);
-
-  // Logo Preview State
-  const [logoPreview, setLogoPreview] = useState<string | undefined>(db.institute.logoUrl);
 
   // Persistence
   useEffect(() => {
@@ -110,7 +94,7 @@ export default function App() {
           if (firstAllowed) setActiveTab(firstAllowed);
         }
       } else {
-        alert('Invalid credentials. Please contact Administrator.');
+        alert('Access Denied: Invalid Security Credentials.');
       }
       setIsLoginLoading(false);
     }, 800);
@@ -122,6 +106,42 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  // --- CRUD Operations ---
+  
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("File size too large. Please upload an image under 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDb(prev => ({
+          ...prev,
+          institute: { ...prev.institute, logoUrl: reader.result as string }
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleInstituteUpdate = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const updatedInstitute: Institute = {
+      ...db.institute,
+      name: formData.get('name') as string,
+      tagline: formData.get('tagline') as string,
+      address: formData.get('address') as string,
+      phone: formData.get('phone') as string,
+      email: formData.get('email') as string,
+    };
+    setDb(prev => ({ ...prev, institute: updatedInstitute }));
+    alert('Branding & Profile Updated Successfully!');
+  };
+
+  // Student methods
   const handleAdmissionSubmit = (formData: any) => {
     if (editingStudent) {
       setDb(prev => ({
@@ -141,16 +161,7 @@ export default function App() {
     setIsAdmissionModalOpen(false);
   };
 
-  const openEditStudent = (student: Student) => {
-    setEditingStudent(student);
-    setIsAdmissionModalOpen(true);
-  };
-
-  const openNewAdmission = () => {
-    setEditingStudent(null);
-    setIsAdmissionModalOpen(true);
-  };
-
+  // Teacher methods
   const handleTeacherSubmit = (formData: any) => {
     if (editingTeacher) {
       setDb(prev => ({
@@ -168,16 +179,7 @@ export default function App() {
     setIsTeacherModalOpen(false);
   };
 
-  const openEditTeacher = (teacher: Teacher) => {
-    setEditingTeacher(teacher);
-    setIsTeacherModalOpen(true);
-  };
-
-  const openNewTeacher = () => {
-    setEditingTeacher(null);
-    setIsTeacherModalOpen(true);
-  };
-
+  // Batch methods
   const handleBatchSubmit = (formData: any) => {
     if (editingBatch) {
       setDb(prev => ({
@@ -195,52 +197,7 @@ export default function App() {
     setIsBatchModalOpen(false);
   };
 
-  const openEditBatch = (batch: Batch) => {
-    setEditingBatch(batch);
-    setIsBatchModalOpen(true);
-  };
-
-  const openNewBatch = () => {
-    setEditingBatch(null);
-    setIsBatchModalOpen(true);
-  };
-
-  const deleteBatch = (id: string) => {
-    if (confirm('Are you sure you want to remove this batch? Associated students will need to be re-assigned.')) {
-      setDb(prev => ({
-        ...prev,
-        batches: prev.batches.filter(b => b.id !== id)
-      }));
-      if (viewingBatchId === id) setViewingBatchId(null);
-    }
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleInstituteUpdate = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const updatedInstitute: Institute = {
-      name: formData.get('name') as string,
-      tagline: formData.get('tagline') as string,
-      address: formData.get('address') as string,
-      phone: formData.get('phone') as string,
-      email: formData.get('email') as string,
-      logoUrl: logoPreview,
-    };
-    setDb(prev => ({ ...prev, institute: updatedInstitute }));
-    alert('Institute profile updated successfully!');
-  };
-
+  // User/RBAC methods
   const handleRoleDefaultUpdate = (role: UserRole, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -256,12 +213,9 @@ export default function App() {
     };
     setDb(prev => ({
       ...prev,
-      roleDefaults: {
-        ...prev.roleDefaults,
-        [role]: newPerms
-      }
+      roleDefaults: { ...prev.roleDefaults, [role]: newPerms }
     }));
-    alert(`${role} default template saved!`);
+    alert(`Global Template for ${role} updated!`);
   };
 
   const handleUserSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -288,22 +242,12 @@ export default function App() {
     };
 
     if (editingUser) {
-      setDb(prev => ({
-        ...prev,
-        users: prev.users.map(u => u.id === editingUser.id ? newUser : u)
-      }));
+      setDb(prev => ({ ...prev, users: prev.users.map(u => u.id === editingUser.id ? newUser : u) }));
       setEditingUser(null);
     } else {
       setDb(prev => ({ ...prev, users: [...prev.users, newUser] }));
     }
     e.currentTarget.reset();
-  };
-
-  const deleteUser = (id: string) => {
-    if (id === 'U1') return alert('Cannot delete the root administrator account.');
-    if (confirm('Permanently remove this login account?')) {
-      setDb(prev => ({ ...prev, users: prev.users.filter(u => u.id !== id) }));
-    }
   };
 
   const applyRoleDefaultsToForm = (role: UserRole) => {
@@ -315,29 +259,7 @@ export default function App() {
     });
   };
 
-  const addPayment = (formData: any) => {
-    const newPayment: Payment = {
-      ...formData,
-      id: Math.random().toString(36).substr(2, 9),
-      receiptNo: generateReceiptNo(),
-      date: new Date().toISOString().split('T')[0]
-    };
-    setDb(prev => ({ ...prev, payments: [...prev.payments, newPayment] }));
-    const student = db.students.find(s => s.id === formData.studentId);
-    if (student) setPrintingPayment({ payment: newPayment, student });
-  };
-
-  const markAttendance = (date: string, batchId: string, records: { studentId: string, status: 'Present' | 'Absent' }[]) => {
-    const newAttendance: Attendance[] = records.map(r => ({
-      id: Math.random().toString(36).substr(2, 9),
-      date,
-      batchId,
-      studentId: r.studentId,
-      status: r.status
-    }));
-    setDb(prev => ({ ...prev, attendance: [...prev.attendance, ...newAttendance] }));
-    alert('Attendance saved successfully!');
-  };
+  // --- Filtered Data ---
 
   const stats = useMemo(() => {
     const totalStudents = db.students.length;
@@ -349,96 +271,45 @@ export default function App() {
 
   const filteredStudents = useMemo(() => db.students.filter(s => 
     s.name.toLowerCase().includes(studentSearch.toLowerCase()) || 
-    s.id.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.mobile.includes(studentSearch)
+    s.id.toLowerCase().includes(studentSearch.toLowerCase())
   ), [db.students, studentSearch]);
 
-  const filteredTeachers = useMemo(() => db.teachers.filter(t => 
-    t.name.toLowerCase().includes(teacherSearch.toLowerCase()) || 
-    t.subjects.some(sub => sub.toLowerCase().includes(teacherSearch.toLowerCase())) ||
-    t.id.toLowerCase().includes(teacherSearch.toLowerCase())
-  ), [db.teachers, teacherSearch]);
-
-  const filteredBatches = useMemo(() => db.batches.filter(b => {
-    const teacherName = db.teachers.find(t => t.id === b.teacherId)?.name || '';
-    return b.name.toLowerCase().includes(batchSearch.toLowerCase()) ||
-      b.course.toLowerCase().includes(batchSearch.toLowerCase()) ||
-      teacherName.toLowerCase().includes(batchSearch.toLowerCase());
-  }), [db.batches, db.teachers, batchSearch]);
-
-  const currentViewingBatch = useMemo(() => 
-    db.batches.find(b => b.id === viewingBatchId) || null
-  , [db.batches, viewingBatchId]);
-
-  const studentsInViewingBatch = useMemo(() => 
-    db.students.filter(s => s.batchId === viewingBatchId)
-  , [db.students, viewingBatchId]);
-
-  if (printingPayment) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center mb-6 no-print">
-            <button 
-              onClick={() => setPrintingPayment(null)}
-              className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all shadow-sm"
-            >
-              <i className="fas fa-arrow-left mr-2"></i> Dashboard
-            </button>
-            <button 
-              onClick={() => window.print()}
-              className="px-6 py-2 bg-[#2d5a8e] text-white rounded-lg hover:bg-[#1e3c5f] transition-all shadow-lg font-bold"
-            >
-              <i className="fas fa-print mr-2"></i> Print Official Receipt
-            </button>
-          </div>
-          <Receipt 
-            payment={printingPayment.payment} 
-            student={printingPayment.student} 
-            instituteName={db.institute.name}
-            instituteAddress={db.institute.address}
-          />
-        </div>
-      </div>
-    );
-  }
+  const p = user?.permissions;
 
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a365d] via-[#2d5a8e] to-[#4299e1] p-4">
         <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
           <div className="bg-[#2d5a8e] p-8 text-center text-white relative">
-             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 via-green-400 to-blue-400"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 via-green-400 to-blue-400"></div>
             <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl overflow-hidden p-2">
                {db.institute.logoUrl ? <img src={db.institute.logoUrl} className="w-full h-full object-contain" /> : <i className="fas fa-user-graduate text-4xl text-[#2d5a8e]"></i>}
             </div>
-            <h1 className="text-3xl font-black tracking-tighter">{db.institute.name}</h1>
+            <h1 className="text-3xl font-black tracking-tighter uppercase">{db.institute.name}</h1>
             <p className="text-blue-100 mt-1 uppercase text-[10px] font-black tracking-widest">{db.institute.tagline}</p>
           </div>
           <form onSubmit={handleLogin} className="p-8 space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Access ID / Username</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Security Key / Username</label>
               <div className="relative">
                 <i className="fas fa-id-card absolute left-4 top-4 text-gray-400"></i>
                 <input 
                   type="text" 
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                  placeholder="Username"
-                  required
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="Username" required
                   value={loginForm.username}
                   onChange={e => setLoginForm({...loginForm, username: e.target.value})}
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Security Key / Password</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Access Password</label>
               <div className="relative">
                 <i className="fas fa-key absolute left-4 top-4 text-gray-400"></i>
                 <input 
                   type="password" 
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                  placeholder="••••••••"
-                  required
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="••••••••" required
                   value={loginForm.password}
                   onChange={e => setLoginForm({...loginForm, password: e.target.value})}
                 />
@@ -447,293 +318,320 @@ export default function App() {
             <button 
               disabled={isLoginLoading}
               type="submit"
-              className="w-full py-4 bg-[#2d5a8e] text-white rounded-xl font-bold hover:bg-[#1e3c5f] active:transform active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#2d5a8e] text-white rounded-xl font-black uppercase tracking-widest hover:bg-[#1e3c5f] transition-all shadow-lg flex items-center justify-center gap-2"
             >
               {isLoginLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-shield-alt"></i>}
-              {isLoginLoading ? 'Verifying Access...' : 'Secure Login'}
+              {isLoginLoading ? 'Verifying...' : 'Login Securely'}
             </button>
-            <div className="text-center space-y-1">
-               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                 Support: {db.institute.phone}
-               </p>
-               <p className="text-[9px] text-gray-300">
-                 Authorized Personnel Only &copy; 2024 {db.institute.name}
-               </p>
-            </div>
+            <p className="text-[9px] text-gray-400 text-center font-bold uppercase tracking-widest">Authorized Access Only &copy; {new Date().getFullYear()}</p>
           </form>
         </div>
       </div>
     );
   }
 
-  const p = user.permissions;
-
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
-      <AdmissionModal 
-        isOpen={isAdmissionModalOpen} 
-        onClose={() => { setIsAdmissionModalOpen(false); setEditingStudent(null); }} 
-        onSubmit={handleAdmissionSubmit} 
-        batches={db.batches}
-        initialData={editingStudent}
-      />
-      
-      <TeacherModal
-        isOpen={isTeacherModalOpen}
-        onClose={() => { setIsTeacherModalOpen(false); setEditingTeacher(null); }}
-        onSubmit={handleTeacherSubmit}
-        initialData={editingTeacher}
-      />
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#f8fafc]">
+      <AdmissionModal isOpen={isAdmissionModalOpen} onClose={() => setIsAdmissionModalOpen(false)} onSubmit={handleAdmissionSubmit} batches={db.batches} initialData={editingStudent} />
+      <TeacherModal isOpen={isTeacherModalOpen} onClose={() => setIsTeacherModalOpen(false)} onSubmit={handleTeacherSubmit} initialData={editingTeacher} />
+      <BatchModal isOpen={isBatchModalOpen} onClose={() => setIsBatchModalOpen(false)} onSubmit={handleBatchSubmit} teachers={db.teachers} initialData={editingBatch} />
 
-      <BatchModal
-        isOpen={isBatchModalOpen}
-        onClose={() => { setIsBatchModalOpen(false); setEditingBatch(null); }}
-        onSubmit={handleBatchSubmit}
-        teachers={db.teachers}
-        initialData={editingBatch}
-      />
-
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-[#1a365d] flex-shrink-0 shadow-2xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-blue-900/50">
-          <div className="bg-white w-10 h-10 rounded-lg flex items-center justify-center text-[#2d5a8e] shadow-lg overflow-hidden p-1">
-            {db.institute.logoUrl ? <img src={db.institute.logoUrl} className="w-full h-full object-contain" /> : <i className="fas fa-user-graduate text-xl"></i>}
+      {/* Main Sidebar */}
+      <aside className="w-full md:w-64 bg-[#1a365d] flex-shrink-0 shadow-2xl z-20 overflow-hidden flex flex-col">
+        <div className="p-6 flex items-center gap-4 border-b border-blue-900/40">
+          <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center shadow-lg overflow-hidden p-1 bg-white">
+            {db.institute.logoUrl ? <img src={db.institute.logoUrl} className="w-full h-full object-contain" /> : <i className="fas fa-graduation-cap text-[#2d5a8e] text-xl"></i>}
           </div>
           <div>
-            <h2 className="text-white font-black tracking-tighter leading-none truncate w-32">{db.institute.name}</h2>
-            <span className="text-blue-300 text-[9px] uppercase font-black tracking-[0.2em]">INSTITUTE ERP</span>
+            <h2 className="text-white font-black text-sm tracking-tight leading-none uppercase truncate w-28">{db.institute.name}</h2>
+            <span className="text-blue-300 text-[8px] font-black uppercase tracking-widest opacity-60">Institute ERP</span>
           </div>
         </div>
         
-        <nav className="mt-4 flex flex-col h-[calc(100vh-100px)] overflow-y-auto">
-          <SidebarItem icon="fa-chart-pie" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} hidden={!p.dashboard} />
-          <SidebarItem icon="fa-user-graduate" label="Students" active={activeTab === 'students'} onClick={() => setActiveTab('students')} hidden={!p.students} />
-          <SidebarItem icon="fa-chalkboard-teacher" label="Teachers" active={activeTab === 'teachers'} onClick={() => { setActiveTab('teachers'); setTeacherSearch(''); }} hidden={!p.teachers} />
-          <SidebarItem icon="fa-layer-group" label="Batches" active={activeTab === 'batches'} onClick={() => { setActiveTab('batches'); setBatchSearch(''); setViewingBatchId(null); }} hidden={!p.batches} />
-          <SidebarItem icon="fa-calendar-check" label="Attendance" active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} hidden={!p.attendance} />
-          <SidebarItem icon="fa-file-invoice-dollar" label="Fees & Payments" active={activeTab === 'fees'} onClick={() => setActiveTab('fees')} hidden={!p.fees} />
-          <SidebarItem icon="fa-file-alt" label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} hidden={!p.reports} />
-          <SidebarItem icon="fa-building" label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} hidden={!p.settings} />
-          
-          <div className="mt-auto border-t border-blue-900/50 pt-4 mb-4">
-            <SidebarItem icon="fa-database" label="System Backup" active={false} onClick={() => { if(confirm('Secure local backup will be downloaded. Proceed?')) backupDB(); }} />
-            <SidebarItem icon="fa-power-off" label="Logout Session" active={false} onClick={logout} />
-          </div>
+        <nav className="mt-4 flex-1 overflow-y-auto">
+          <SidebarItem icon="fa-chart-pie" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} hidden={!p?.dashboard} />
+          <SidebarItem icon="fa-user-graduate" label="Students" active={activeTab === 'students'} onClick={() => setActiveTab('students')} hidden={!p?.students} />
+          <SidebarItem icon="fa-chalkboard-teacher" label="Teachers" active={activeTab === 'teachers'} onClick={() => setActiveTab('teachers')} hidden={!p?.teachers} />
+          <SidebarItem icon="fa-layer-group" label="Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} hidden={!p?.batches} />
+          <SidebarItem icon="fa-calendar-check" label="Attendance" active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} hidden={!p?.attendance} />
+          <SidebarItem icon="fa-file-invoice-dollar" label="Fees Management" active={activeTab === 'fees'} onClick={() => setActiveTab('fees')} hidden={!p?.fees} />
+          <SidebarItem icon="fa-file-alt" label="Reports Center" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} hidden={!p?.reports} />
+          <SidebarItem icon="fa-sliders-h" label="More Options" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} hidden={!p?.settings} />
         </nav>
+
+        <div className="p-4 mt-auto border-t border-blue-900/40 space-y-2">
+           <button onClick={logout} className="w-full py-3 bg-red-500/10 text-red-400 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-500 hover:text-white transition-all">
+             Logout Session
+           </button>
+        </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        {/* Top Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      {/* Workspace Area */}
+      <main className="flex-1 overflow-y-auto">
+        <header className="px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b bg-white border-gray-100">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 capitalize tracking-tight">
-              {activeTab === 'settings' ? 'Global Settings' : `${activeTab}`}
+            <h1 className="text-2xl font-black text-gray-800 tracking-tight uppercase">
+              {activeTab === 'settings' ? 'Global System Settings' : activeTab}
             </h1>
-            <div className="flex items-center gap-2 text-gray-500 text-sm">
-               <span className="font-medium">{user.name}</span>
-               <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-               <span className="bg-[#2d5a8e]/10 text-[#2d5a8e] px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">{user.role}</span>
-            </div>
+            <p className="text-xs text-gray-400 font-medium">Authorized Workspace: <span className="text-[#2d5a8e] font-black">{user.name}</span></p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 ml-2 border-l pl-6 border-gray-200">
-               <div className="text-right">
-                  <p className="text-xs font-black text-[#2d5a8e] uppercase">{db.institute.phone}</p>
-                  <p className="text-[10px] text-gray-400 font-medium">{db.institute.email}</p>
-               </div>
-               <div className="w-11 h-11 rounded-full bg-[#2d5a8e] flex items-center justify-center text-white font-bold border-4 border-white shadow-md">
-                 {user.name.charAt(0)}
-               </div>
-            </div>
+          <div className="flex items-center gap-6">
+             <div className="text-right hidden md:block">
+               <p className="text-[10px] font-black text-[#2d5a8e] uppercase tracking-widest">{db.institute.phone}</p>
+               <p className="text-[9px] text-gray-400 font-bold">{db.institute.email}</p>
+             </div>
+             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#2d5a8e] to-[#4299e1] flex items-center justify-center text-white font-black text-lg shadow-lg">
+                {user.name.charAt(0)}
+             </div>
           </div>
         </header>
 
-        {activeTab === 'dashboard' && p.dashboard && (
-          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card title="Total Students" value={stats.totalStudents} icon="fa-users" color="bg-[#2d5a8e]" />
-              <Card title="Active Batches" value={stats.totalBatches} icon="fa-book" color="bg-[#9dc84a]" />
-              <Card title="Total Revenue" value={formatCurrency(stats.totalFeesCollected)} icon="fa-coins" color="bg-[#f9a01b]" />
-              <Card title="Faculty Strength" value={db.teachers.length} icon="fa-user-tie" color="bg-purple-600" />
+        <div className="p-8">
+          {activeTab === 'dashboard' && (
+            <div className="space-y-8 animate-in fade-in duration-700">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                 <Card title="Students Active" value={stats.activeStudents} icon="fa-user-graduate" color="bg-[#2d5a8e]" />
+                 <Card title="Faculty Count" value={db.teachers.length} icon="fa-user-tie" color="bg-purple-600" />
+                 <Card title="Live Batches" value={stats.totalBatches} icon="fa-layer-group" color="bg-[#9dc84a]" />
+                 <Card title="Total Revenue" value={formatCurrency(stats.totalFeesCollected)} icon="fa-coins" color="bg-[#f9a01b]" />
+               </div>
+               <div className="bg-white p-20 rounded-3xl border border-gray-100 shadow-sm text-center">
+                  <div className="w-32 h-32 mx-auto mb-6 bg-gray-50 rounded-3xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-100">
+                    {db.institute.logoUrl ? <img src={db.institute.logoUrl} className="w-full h-full object-contain p-2" /> : <i className="fas fa-university text-5xl text-gray-200"></i>}
+                  </div>
+                  <h2 className="text-3xl font-black text-gray-800 uppercase tracking-tighter mb-2">{db.institute.name}</h2>
+                  <p className="text-gray-400 uppercase text-xs font-black tracking-[0.4em] mb-8">{db.institute.tagline}</p>
+                  <button onClick={() => setActiveTab('settings')} className="bg-[#2d5a8e] text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:shadow-blue-200 transition-all">
+                     Update Branding & Options
+                  </button>
+               </div>
             </div>
-            {/* Dashboard detail views removed for brevity as focus is on Settings update */}
-          </div>
-        )}
+          )}
 
-        {/* --- Render Modules based on activeTab (Simplified for Settings Focus) --- */}
-        {activeTab === 'students' && p.students && <div className="p-4 bg-white rounded-xl">Student Management Screen</div>}
-        {activeTab === 'teachers' && p.teachers && <div className="p-4 bg-white rounded-xl">Teacher Management Screen</div>}
-        {activeTab === 'batches' && p.batches && <div className="p-4 bg-white rounded-xl">Batch Management Screen</div>}
-        {activeTab === 'attendance' && p.attendance && <div className="p-4 bg-white rounded-xl">Attendance Management Screen</div>}
-        {activeTab === 'fees' && p.fees && <div className="p-4 bg-white rounded-xl">Fee Management Screen</div>}
-        {activeTab === 'reports' && p.reports && <div className="p-4 bg-white rounded-xl">Report Export Screen</div>}
-
-        {/* --- Settings tab with Role Templates and User Management --- */}
-        {activeTab === 'settings' && p.settings && (
-          <div className="animate-in fade-in duration-500 max-w-6xl space-y-12">
-             {/* 1. Business Profile Section */}
-             <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#2d5a8e]"></div>
-               <div className="mb-8">
-                 <h4 className="font-black text-gray-800 uppercase tracking-[0.2em] text-xs">Business Profile Management</h4>
-                 <p className="text-xs text-gray-400 font-medium">Configure institute branding and contact details.</p>
-               </div>
-
-               <form onSubmit={handleInstituteUpdate} className="space-y-8">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   <div className="space-y-6">
-                     <div className="flex items-center gap-6">
-                        <div className="w-24 h-24 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden group relative">
-                          {logoPreview ? <img src={logoPreview} className="w-full h-full object-contain p-2" /> : <i className="fas fa-image text-gray-300 text-2xl"></i>}
-                          <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                            <i className="fas fa-camera text-white"></i>
-                            <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                          </label>
-                        </div>
-                        <div className="flex-1">
-                           <p className="text-xs font-bold text-gray-700">Brand Logo</p>
-                           <p className="text-[10px] text-gray-400">JPG/PNG recommended.</p>
-                        </div>
-                     </div>
-                     <input name="name" required defaultValue={db.institute.name} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] outline-none font-bold" placeholder="Institute Name" />
-                     <input name="tagline" defaultValue={db.institute.tagline} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] outline-none" placeholder="Mission Tagline" />
-                   </div>
-                   <div className="space-y-4">
-                     <textarea name="address" required defaultValue={db.institute.address} rows={3} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" placeholder="Address" />
-                     <input name="phone" required defaultValue={db.institute.phone} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" placeholder="Phone" />
-                     <input name="email" type="email" required defaultValue={db.institute.email} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" placeholder="Email" />
-                   </div>
-                 </div>
-                 <button type="submit" className="bg-[#2d5a8e] text-white px-10 py-4 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg flex items-center gap-3 transition-all">
-                   <i className="fas fa-save"></i> Save Profile Changes
-                 </button>
-               </form>
-             </div>
-
-             {/* 2. Role Access Templates (CENTRAL PERMISSIONS CONTROL) */}
-             <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#9dc84a]"></div>
-               <div className="mb-8">
-                 <h4 className="font-black text-gray-800 uppercase tracking-[0.2em] text-xs">Role Access Templates</h4>
-                 <p className="text-xs text-gray-400 font-medium">Define default permissions for different user roles. New accounts will inherit these settings.</p>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                 {[UserRole.TEACHER, UserRole.STUDENT].map(role => (
-                   <div key={role} className="p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
-                     <h5 className="font-black text-[#2d5a8e] text-sm uppercase mb-6 flex items-center gap-2">
-                       <i className={role === UserRole.TEACHER ? "fas fa-chalkboard-teacher" : "fas fa-user-graduate"}></i>
-                       {role} Default Permissions
-                     </h5>
-                     <form onSubmit={(e) => handleRoleDefaultUpdate(role, e)} className="space-y-4">
-                       <div className="grid grid-cols-2 gap-3">
-                         {Object.keys(db.roleDefaults[role]).map(mod => (
-                           <label key={mod} className="flex items-center gap-2 cursor-pointer group bg-white p-3 rounded-xl border border-gray-100 hover:border-blue-200 shadow-sm transition-all">
-                             <input type="checkbox" name={`perm-${mod}`} defaultChecked={(db.roleDefaults[role] as any)[mod]} className="w-4 h-4 accent-[#2d5a8e]" />
-                             <span className="text-[10px] font-black text-gray-600 group-hover:text-[#2d5a8e] capitalize tracking-wider">{mod}</span>
-                           </label>
-                         ))}
-                       </div>
-                       <button type="submit" className="w-full mt-4 bg-[#2d5a8e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#1e3c5f] transition-all">
-                         Save {role} Template
-                       </button>
-                     </form>
-                   </div>
-                 ))}
-               </div>
-             </div>
-
-             {/* 3. User Management Section */}
-             <section className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500"></div>
-              <h4 className="font-black text-gray-800 uppercase tracking-[0.2em] text-xs mb-8">Access Control & Individual User Management</h4>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                <div className="lg:col-span-1 border-r border-gray-100 pr-0 lg:pr-12">
-                   <h5 className="text-sm font-black text-[#2d5a8e] uppercase mb-6">{editingUser ? 'Update Account' : 'Create New Account'}</h5>
-                   <form ref={userFormRef} onSubmit={handleUserSubmit} className="space-y-4">
-                      <input name="name" required defaultValue={editingUser?.name} placeholder="Display Name" className="w-full p-3 bg-gray-50 border rounded-xl outline-none font-bold" />
-                      <input name="username" required defaultValue={editingUser?.username} placeholder="Username" className="w-full p-3 bg-gray-50 border rounded-xl outline-none" />
-                      <input name="password" placeholder={editingUser ? "Keep current" : "Password"} className="w-full p-3 bg-gray-50 border rounded-xl outline-none" type="password" />
-                      <select 
-                        name="role" 
-                        className="w-full p-3 bg-gray-50 border rounded-xl outline-none font-bold text-gray-600" 
-                        defaultValue={editingUser?.role || UserRole.TEACHER}
-                        onChange={(e) => applyRoleDefaultsToForm(e.target.value as UserRole)}
-                      >
-                        <option value={UserRole.ADMIN}>ADMINISTRATOR</option>
-                        <option value={UserRole.TEACHER}>TEACHER</option>
-                        <option value={UserRole.STUDENT}>STUDENT</option>
-                      </select>
-                      
-                      <div className="pt-4 space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Individual Overrides</label>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                          {['dashboard', 'students', 'teachers', 'batches', 'attendance', 'fees', 'reports', 'settings'].map(mod => (
-                            <label key={mod} className="flex items-center gap-2 cursor-pointer group">
-                              <input type="checkbox" name={`perm-${mod}`} defaultChecked={editingUser ? (editingUser.permissions as any)[mod] : (db.roleDefaults[UserRole.TEACHER] as any)[mod]} className="w-4 h-4 accent-[#2d5a8e]" />
-                              <span className="text-xs font-bold text-gray-600 group-hover:text-[#2d5a8e] capitalize">{mod}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="pt-6 flex gap-2">
-                        {editingUser && <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold">Cancel</button>}
-                        <button type="submit" className="flex-2 grow bg-orange-600 text-white py-3 rounded-xl font-bold shadow-lg">{editingUser ? 'Update' : 'Create'}</button>
-                      </div>
-                   </form>
-                </div>
-
-                <div className="lg:col-span-2">
-                   <h5 className="text-sm font-black text-[#2d5a8e] uppercase mb-6">Existing System Accounts</h5>
-                   <div className="overflow-x-auto">
-                     <table className="w-full text-left">
-                       <thead className="bg-gray-50 text-[9px] font-black uppercase text-gray-400 border-b">
-                         <tr>
-                           <th className="p-3">User</th>
-                           <th className="p-3">Role</th>
-                           <th className="p-3 text-right">Action</th>
-                         </tr>
-                       </thead>
-                       <tbody className="divide-y divide-gray-50 text-xs">
-                         {db.users.map(u => (
-                           <tr key={u.id} className="hover:bg-gray-50/50">
-                             <td className="p-3">
-                               <p className="font-bold text-gray-700">{u.name}</p>
-                               <p className="text-[10px] text-gray-400">@{u.username}</p>
-                             </td>
-                             <td className="p-3">
-                               <span className={`px-2 py-0.5 rounded-full font-black uppercase text-[8px] ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                 {u.role}
-                               </span>
-                             </td>
-                             <td className="p-3 text-right">
-                               <div className="flex justify-end gap-2">
-                                  <button onClick={() => setEditingUser(u)} className="w-7 h-7 bg-blue-50 text-[#2d5a8e] rounded flex items-center justify-center hover:bg-blue-100"><i className="fas fa-edit"></i></button>
-                                  <button onClick={() => deleteUser(u.id)} className="w-7 h-7 bg-red-50 text-red-500 rounded flex items-center justify-center hover:bg-red-100"><i className="fas fa-trash-alt"></i></button>
-                               </div>
-                             </td>
-                           </tr>
-                         ))}
-                       </tbody>
-                     </table>
-                   </div>
-                </div>
+          {activeTab === 'students' && (
+            <div className="animate-in fade-in duration-500">
+              <div className="flex justify-between items-center mb-8">
+                <SearchBar value={studentSearch} onChange={setStudentSearch} placeholder="Search Name, ID..." />
+                <button onClick={() => setIsAdmissionModalOpen(true)} className="bg-[#2d5a8e] text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-100">
+                  New Enrollment
+                </button>
               </div>
-            </section>
-          </div>
-        )}
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                 <table className="w-full">
+                   <thead className="bg-gray-50 border-b">
+                     <tr>
+                       <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Enroll ID</th>
+                       <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
+                       <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Course</th>
+                       <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-50">
+                     {filteredStudents.map(s => (
+                       <tr key={s.id} className="hover:bg-blue-50/20">
+                         <td className="p-4 font-mono font-black text-xs text-[#2d5a8e]">{s.id}</td>
+                         <td className="p-4 font-black text-gray-700">{s.name}</td>
+                         <td className="p-4 text-xs font-bold text-gray-500">{s.course}</td>
+                         <td className="p-4 text-center">
+                           <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                             {s.status}
+                           </span>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* --- SETTINGS: THE "MORE OPTIONS" PAGE --- */}
+          {activeTab === 'settings' && (
+            <div className="animate-in slide-in-from-bottom-6 duration-700 max-w-6xl mx-auto space-y-12 pb-12">
+               
+               {/* Internal Navigation for Settings */}
+               <div className="flex bg-white p-2 rounded-2xl border border-gray-100 shadow-sm w-fit mx-auto">
+                 <button onClick={() => setSettingsSubTab('profile')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${settingsSubTab === 'profile' ? 'bg-[#2d5a8e] text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}>
+                   Institute Branding
+                 </button>
+                 <button onClick={() => setSettingsSubTab('users')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${settingsSubTab === 'users' ? 'bg-[#2d5a8e] text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}>
+                   Staff & Access
+                 </button>
+                 <button onClick={() => setSettingsSubTab('templates')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${settingsSubTab === 'templates' ? 'bg-[#2d5a8e] text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}>
+                   Role Templates
+                 </button>
+               </div>
+
+               {/* Branding & Profile Sub-Tab */}
+               {settingsSubTab === 'profile' && (
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in duration-500">
+                    <div className="lg:col-span-1 space-y-8">
+                       <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-center">
+                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Master Brand Identity</h4>
+                          <div className="w-32 h-32 mx-auto relative group">
+                            <div className="w-full h-full bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden p-2">
+                               {db.institute.logoUrl ? <img src={db.institute.logoUrl} className="w-full h-full object-contain" /> : <i className="fas fa-university text-4xl text-gray-200 mt-8"></i>}
+                            </div>
+                            <label className="absolute inset-0 bg-black/40 text-white rounded-3xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                               <i className="fas fa-camera text-2xl mb-1"></i>
+                               <span className="text-[9px] font-black uppercase">Change Logo</span>
+                               <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                            </label>
+                          </div>
+                          <div className="mt-6">
+                            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">{db.institute.name}</h3>
+                            <p className="text-[10px] text-[#2d5a8e] font-black uppercase tracking-widest mt-1">Official Brand Partner</p>
+                          </div>
+                          <div className="mt-8 pt-6 border-t border-gray-50 flex gap-2">
+                             <button onClick={() => backupDB()} className="flex-1 py-3 bg-gray-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-200 transition-all">Download Backup</button>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                       <div className="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm">
+                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-10 pb-4 border-b border-gray-50">Institute Details Management</h4>
+                          <form onSubmit={handleInstituteUpdate} className="space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                               <div className="space-y-2">
+                                  <label className="text-[9px] font-black text-[#2d5a8e] uppercase tracking-widest ml-1">Official Institute Name *</label>
+                                  <input name="name" required defaultValue={db.institute.name} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#2d5a8e] outline-none font-bold text-gray-800" />
+                               </div>
+                               <div className="space-y-2">
+                                  <label className="text-[9px] font-black text-[#2d5a8e] uppercase tracking-widest ml-1">Brand Tagline / Mission</label>
+                                  <input name="tagline" defaultValue={db.institute.tagline} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#2d5a8e] outline-none font-bold text-gray-500" />
+                               </div>
+                               <div className="space-y-2 md:col-span-2">
+                                  <label className="text-[9px] font-black text-[#2d5a8e] uppercase tracking-widest ml-1">Registered Address *</label>
+                                  <textarea name="address" required rows={3} defaultValue={db.institute.address} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#2d5a8e] outline-none font-bold text-gray-600" />
+                               </div>
+                               <div className="space-y-2">
+                                  <label className="text-[9px] font-black text-[#2d5a8e] uppercase tracking-widest ml-1">Primary Contact *</label>
+                                  <input name="phone" required defaultValue={db.institute.phone} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#2d5a8e] outline-none font-bold" />
+                               </div>
+                               <div className="space-y-2">
+                                  <label className="text-[9px] font-black text-[#2d5a8e] uppercase tracking-widest ml-1">Official Email *</label>
+                                  <input name="email" type="email" required defaultValue={db.institute.email} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#2d5a8e] outline-none font-bold" />
+                               </div>
+                            </div>
+                            <div className="pt-6">
+                               <button type="submit" className="w-full py-5 bg-[#2d5a8e] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-100 hover:bg-[#1e3c5f] transition-all flex items-center justify-center gap-3">
+                                  <i className="fas fa-check-circle text-lg"></i> Confirm branding updates
+                               </button>
+                            </div>
+                          </form>
+                       </div>
+                    </div>
+                 </div>
+               )}
+
+               {/* Access & User Management Sub-Tab */}
+               {settingsSubTab === 'users' && (
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in slide-in-from-right-10 duration-500">
+                    <div className="lg:col-span-1">
+                       <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Authorize User</h4>
+                          <form ref={userFormRef} onSubmit={handleUserSubmit} className="space-y-6">
+                             <input name="name" required defaultValue={editingUser?.name} placeholder="Full Name" className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none font-bold" />
+                             <input name="username" required defaultValue={editingUser?.username} placeholder="Username" className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none" />
+                             <input name="password" type="password" placeholder={editingUser ? "Keep Current" : "Password"} className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none" />
+                             <select name="role" required className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none font-black text-[10px] uppercase tracking-widest" onChange={e => applyRoleDefaultsToForm(e.target.value as UserRole)}>
+                                <option value={UserRole.ADMIN}>Admin</option>
+                                <option value={UserRole.TEACHER}>Teacher</option>
+                                <option value={UserRole.STUDENT}>Student</option>
+                             </select>
+                             <div className="grid grid-cols-2 gap-2 pt-4">
+                                {Object.keys(defaultAdminPermissions).map(mod => (
+                                  <label key={mod} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                     <input type="checkbox" name={`perm-${mod}`} className="w-3 h-3 accent-[#2d5a8e]" defaultChecked={editingUser ? (editingUser.permissions as any)[mod] : (db.roleDefaults[UserRole.TEACHER] as any)[mod]} />
+                                     <span className="text-[9px] font-black uppercase text-gray-500">{mod}</span>
+                                  </label>
+                                ))}
+                             </div>
+                             <button type="submit" className="w-full py-4 bg-orange-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-orange-50">
+                                {editingUser ? 'Update Access' : 'Create User'}
+                             </button>
+                          </form>
+                       </div>
+                    </div>
+                    <div className="lg:col-span-2">
+                       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                          <table className="w-full text-left">
+                             <thead className="bg-gray-50/50">
+                                <tr>
+                                   <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Authorized Staff</th>
+                                   <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
+                                   <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                                </tr>
+                             </thead>
+                             <tbody className="divide-y divide-gray-50">
+                                {db.users.map(u => (
+                                  <tr key={u.id} className="hover:bg-gray-50/20">
+                                     <td className="p-4">
+                                        <p className="font-black text-gray-800 text-sm tracking-tight">{u.name}</p>
+                                        <p className="text-[10px] font-mono text-gray-400">@{u.username}</p>
+                                     </td>
+                                     <td className="p-4">
+                                        <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase ${u.role === UserRole.ADMIN ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span>
+                                     </td>
+                                     <td className="p-4 text-right">
+                                        <div className="flex justify-end gap-2">
+                                           <button onClick={() => setEditingUser(u)} className="w-8 h-8 flex items-center justify-center bg-blue-50 text-[#2d5a8e] rounded-lg hover:bg-blue-100"><i className="fas fa-edit text-xs"></i></button>
+                                           <button onClick={() => u.id !== 'U1' && confirm('Revoke access?') && setDb(prev => ({...prev, users: prev.users.filter(usr => usr.id !== u.id)}))} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100"><i className="fas fa-trash text-xs"></i></button>
+                                        </div>
+                                     </td>
+                                  </tr>
+                                ))}
+                             </tbody>
+                          </table>
+                       </div>
+                    </div>
+                 </div>
+               )}
+
+               {/* Templates Sub-Tab */}
+               {settingsSubTab === 'templates' && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-in slide-in-from-left-10 duration-500">
+                    {[UserRole.TEACHER, UserRole.STUDENT].map(role => (
+                      <div key={role} className="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
+                         <div className="absolute top-0 left-0 w-1.5 h-full bg-[#9dc84a]"></div>
+                         <h5 className="font-black text-[#2d5a8e] text-sm uppercase tracking-widest mb-10 flex items-center gap-3">
+                           <i className={role === UserRole.TEACHER ? "fas fa-chalkboard-teacher" : "fas fa-user-graduate"}></i>
+                           Global Access Template: {role}
+                         </h5>
+                         <form onSubmit={(e) => handleRoleDefaultUpdate(role, e)} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                               {Object.keys(db.roleDefaults[role]).map(mod => (
+                                 <label key={mod} className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:border-blue-200 cursor-pointer transition-all">
+                                   <input type="checkbox" name={`perm-${mod}`} defaultChecked={(db.roleDefaults[role] as any)[mod]} className="w-4 h-4 accent-[#2d5a8e]" />
+                                   <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{mod}</span>
+                                 </label>
+                               ))}
+                            </div>
+                            <button type="submit" className="w-full mt-6 py-4 bg-[#2d5a8e] text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:opacity-90 transition-all">
+                               Save Role Standards
+                            </button>
+                         </form>
+                      </div>
+                    ))}
+                 </div>
+               )}
+
+            </div>
+          )}
+        </div>
       </main>
-      
-      <footer className="fixed bottom-0 right-0 p-3 text-[9px] text-gray-400 no-print flex items-center gap-3 pointer-events-none backdrop-blur-md bg-white/50 rounded-tl-xl border-l border-t border-gray-200 shadow-xl">
-        <span className="flex items-center gap-2 font-bold tracking-widest">
-           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 
-           {db.institute.name.toUpperCase()} ERP ACTIVE
-        </span>
-        <span className="text-gray-300">|</span>
-        <span className="font-black uppercase tracking-tighter">v1.0.4 PRODUCTION BUILD</span>
+
+      {/* Floating Status Bar */}
+      <footer className="fixed bottom-0 right-0 p-3 no-print pointer-events-none z-50">
+        <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-gray-200 shadow-2xl flex items-center gap-4">
+           <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="text-[8px] font-black text-[#2d5a8e] uppercase tracking-widest">{db.institute.name} ACTIVE</span>
+           </div>
+           <span className="text-gray-300 text-[10px]">|</span>
+           <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">v1.0.4 PRODUCTION</span>
+        </div>
       </footer>
     </div>
   );
