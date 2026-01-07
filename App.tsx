@@ -5,13 +5,15 @@ import { getDB, saveDB, generateStudentId, generateReceiptNo, backupDB } from '.
 import { formatCurrency } from './utils/formatters';
 import Receipt from './components/Receipt';
 import AdmissionModal from './components/AdmissionModal';
+import TeacherModal from './components/TeacherModal';
+import BatchModal from './components/BatchModal';
 
 // --- Sub-Components ---
 
 const SidebarItem = ({ icon, label, active, onClick }: { icon: string, label: string, active: boolean, onClick: () => void }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-6 py-4 transition-all ${active ? 'bg-blue-700 text-white shadow-lg z-10' : 'text-blue-100 hover:bg-blue-800'}`}
+    className={`w-full flex items-center gap-3 px-6 py-4 transition-all ${active ? 'bg-[#2d5a8e] text-white shadow-lg z-10' : 'text-blue-100 hover:bg-[#1e3c5f]'}`}
   >
     <i className={`fas ${icon} w-6`}></i>
     <span className="font-medium">{label}</span>
@@ -30,18 +32,44 @@ const Card = ({ title, value, icon, color }: { title: string, value: string | nu
   </div>
 );
 
+const SearchBar = ({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder: string }) => (
+  <div className="relative flex-1 max-w-md">
+    <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+    <input 
+      type="text" 
+      placeholder={placeholder} 
+      className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#2d5a8e] shadow-sm outline-none transition-all"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+    />
+  </div>
+);
+
 // --- Main App ---
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [db, setDb] = useState(getDB());
-  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Search States
+  const [studentSearch, setStudentSearch] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [batchSearch, setBatchSearch] = useState('');
+
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [printingPayment, setPrintingPayment] = useState<{payment: Payment, student: Student} | null>(null);
+  
+  // Modals States
   const [isAdmissionModalOpen, setIsAdmissionModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+
+  const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
 
   // Persistence
   useEffect(() => {
@@ -70,14 +98,12 @@ export default function App() {
   // Student Methods
   const handleAdmissionSubmit = (formData: any) => {
     if (editingStudent) {
-      // Update existing
       setDb(prev => ({
         ...prev,
         students: prev.students.map(s => s.id === editingStudent.id ? { ...s, ...formData } : s)
       }));
       setEditingStudent(null);
     } else {
-      // Add new
       const newStudent: Student = {
         ...formData,
         id: generateStudentId(),
@@ -100,21 +126,59 @@ export default function App() {
   };
 
   // Teacher Methods
-  const addTeacher = (formData: any) => {
-    const newTeacher: Teacher = {
-      ...formData,
-      id: `TCH-${Math.floor(Math.random() * 900) + 100}`,
-    };
-    setDb(prev => ({ ...prev, teachers: [...prev.teachers, newTeacher] }));
+  const handleTeacherSubmit = (formData: any) => {
+    if (editingTeacher) {
+      setDb(prev => ({
+        ...prev,
+        teachers: prev.teachers.map(t => t.id === editingTeacher.id ? { ...t, ...formData } : t)
+      }));
+      setEditingTeacher(null);
+    } else {
+      const newTeacher: Teacher = {
+        ...formData,
+        id: `TCH-${Math.floor(Math.random() * 900) + 100}`,
+      };
+      setDb(prev => ({ ...prev, teachers: [...prev.teachers, newTeacher] }));
+    }
+    setIsTeacherModalOpen(false);
+  };
+
+  const openEditTeacher = (teacher: Teacher) => {
+    setEditingTeacher(teacher);
+    setIsTeacherModalOpen(true);
+  };
+
+  const openNewTeacher = () => {
+    setEditingTeacher(null);
+    setIsTeacherModalOpen(true);
   };
 
   // Batch Methods
-  const addBatch = (formData: any) => {
-    const newBatch: Batch = {
-      ...formData,
-      id: `BCH-${Math.floor(Math.random() * 900) + 100}`,
-    };
-    setDb(prev => ({ ...prev, batches: [...prev.batches, newBatch] }));
+  const handleBatchSubmit = (formData: any) => {
+    if (editingBatch) {
+      setDb(prev => ({
+        ...prev,
+        batches: prev.batches.map(b => b.id === editingBatch.id ? { ...b, ...formData } : b)
+      }));
+      setEditingBatch(null);
+    } else {
+      const newBatch: Batch = {
+        ...formData,
+        id: `BCH-${Math.floor(Math.random() * 900) + 100}`,
+      };
+      setDb(prev => ({ ...prev, batches: [...prev.batches, newBatch] }));
+    }
+    setIsBatchModalOpen(false);
+  };
+
+  const openEditBatch = (batch: Batch) => {
+    setEditingBatch(batch);
+    setIsBatchModalOpen(true);
+  };
+
+  const openNewBatch = () => {
+    setEditingBatch(null);
+    setIsBatchModalOpen(true);
   };
 
   const addPayment = (formData: any) => {
@@ -141,7 +205,7 @@ export default function App() {
     alert('Attendance saved successfully!');
   };
 
-  // Calculations
+  // Filtered Data
   const stats = useMemo(() => {
     const totalStudents = db.students.length;
     const activeStudents = db.students.filter(s => s.status === 'Active').length;
@@ -150,11 +214,24 @@ export default function App() {
     return { totalStudents, activeStudents, totalFeesCollected, totalBatches };
   }, [db]);
 
-  const filteredStudents = db.students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.mobile.includes(searchQuery)
-  );
+  const filteredStudents = useMemo(() => db.students.filter(s => 
+    s.name.toLowerCase().includes(studentSearch.toLowerCase()) || 
+    s.id.toLowerCase().includes(studentSearch.toLowerCase()) ||
+    s.mobile.includes(studentSearch)
+  ), [db.students, studentSearch]);
+
+  const filteredTeachers = useMemo(() => db.teachers.filter(t => 
+    t.name.toLowerCase().includes(teacherSearch.toLowerCase()) || 
+    t.subjects.some(sub => sub.toLowerCase().includes(teacherSearch.toLowerCase())) ||
+    t.id.toLowerCase().includes(teacherSearch.toLowerCase())
+  ), [db.teachers, teacherSearch]);
+
+  const filteredBatches = useMemo(() => db.batches.filter(b => {
+    const teacherName = db.teachers.find(t => t.id === b.teacherId)?.name || '';
+    return b.name.toLowerCase().includes(batchSearch.toLowerCase()) ||
+      b.course.toLowerCase().includes(batchSearch.toLowerCase()) ||
+      teacherName.toLowerCase().includes(batchSearch.toLowerCase());
+  }), [db.batches, db.teachers, batchSearch]);
 
   if (printingPayment) {
     return (
@@ -163,15 +240,15 @@ export default function App() {
           <div className="flex justify-between items-center mb-6 no-print">
             <button 
               onClick={() => setPrintingPayment(null)}
-              className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700"
+              className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all shadow-sm"
             >
-              <i className="fas fa-arrow-left mr-2"></i> Back to ERP
+              <i className="fas fa-arrow-left mr-2"></i> Dashboard
             </button>
             <button 
               onClick={() => window.print()}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-6 py-2 bg-[#2d5a8e] text-white rounded-lg hover:bg-[#1e3c5f] transition-all shadow-lg font-bold"
             >
-              <i className="fas fa-print mr-2"></i> Print / Save as PDF
+              <i className="fas fa-print mr-2"></i> Print Official Receipt
             </button>
           </div>
           <Receipt payment={printingPayment.payment} student={printingPayment.student} />
@@ -182,18 +259,21 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a365d] via-[#2d5a8e] to-[#4299e1] p-4">
         <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
-          <div className="bg-blue-600 p-8 text-center text-white">
-            <i className="fas fa-university text-5xl mb-4"></i>
-            <h1 className="text-3xl font-black">EduNexus ERP</h1>
-            <p className="text-blue-100 mt-2">Professional Institute Management</p>
+          <div className="bg-[#2d5a8e] p-8 text-center text-white relative">
+             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 via-green-400 to-blue-400"></div>
+            <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+               <i className="fas fa-user-graduate text-4xl text-[#2d5a8e]"></i>
+            </div>
+            <h1 className="text-3xl font-black tracking-tighter">SKILLOPEDIA</h1>
+            <p className="text-blue-100 mt-1 uppercase text-[10px] font-black tracking-widest">Personality Development Institute</p>
           </div>
           <form onSubmit={handleLogin} className="p-8 space-y-6">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Username</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Access Key (Username)</label>
               <div className="relative">
-                <i className="fas fa-user absolute left-4 top-4 text-gray-400"></i>
+                <i className="fas fa-id-card absolute left-4 top-4 text-gray-400"></i>
                 <input 
                   type="text" 
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
@@ -205,9 +285,9 @@ export default function App() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Password</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Security Password</label>
               <div className="relative">
-                <i className="fas fa-lock absolute left-4 top-4 text-gray-400"></i>
+                <i className="fas fa-key absolute left-4 top-4 text-gray-400"></i>
                 <input 
                   type="password" 
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
@@ -221,14 +301,19 @@ export default function App() {
             <button 
               disabled={isLoginLoading}
               type="submit"
-              className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 active:transform active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#2d5a8e] text-white rounded-xl font-bold hover:bg-[#1e3c5f] active:transform active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
             >
-              {isLoginLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-sign-in-alt"></i>}
-              {isLoginLoading ? 'Logging in...' : 'Access Dashboard'}
+              {isLoginLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-shield-alt"></i>}
+              {isLoginLoading ? 'Authorizing...' : 'Enter System'}
             </button>
-            <p className="text-xs text-center text-gray-400 mt-4">
-              v1.0.4 Commercial Release &copy; 2024 EduNexus Tech
-            </p>
+            <div className="text-center space-y-1">
+               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                 Contact: +91 8509642898
+               </p>
+               <p className="text-[9px] text-gray-300">
+                 Authorized Access Only &copy; 2024 Skillopedia Institute
+               </p>
+            </div>
           </form>
         </div>
       </div>
@@ -244,16 +329,31 @@ export default function App() {
         batches={db.batches}
         initialData={editingStudent}
       />
+      
+      <TeacherModal
+        isOpen={isTeacherModalOpen}
+        onClose={() => { setIsTeacherModalOpen(false); setEditingTeacher(null); }}
+        onSubmit={handleTeacherSubmit}
+        initialData={editingTeacher}
+      />
+
+      <BatchModal
+        isOpen={isBatchModalOpen}
+        onClose={() => { setIsBatchModalOpen(false); setEditingBatch(null); }}
+        onSubmit={handleBatchSubmit}
+        teachers={db.teachers}
+        initialData={editingBatch}
+      />
 
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-blue-900 flex-shrink-0 shadow-2xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-blue-800">
-          <div className="bg-white w-10 h-10 rounded-lg flex items-center justify-center text-blue-900 shadow-lg">
-            <i className="fas fa-bolt text-xl"></i>
+      <aside className="w-full md:w-64 bg-[#1a365d] flex-shrink-0 shadow-2xl z-20">
+        <div className="p-6 flex items-center gap-3 border-b border-blue-900/50">
+          <div className="bg-white w-10 h-10 rounded-lg flex items-center justify-center text-[#2d5a8e] shadow-lg">
+            <i className="fas fa-user-graduate text-xl"></i>
           </div>
           <div>
-            <h2 className="text-white font-bold leading-none">EduNexus</h2>
-            <span className="text-blue-300 text-[10px] uppercase font-black tracking-widest">ERP PRO</span>
+            <h2 className="text-white font-black tracking-tighter leading-none">SKILLOPEDIA</h2>
+            <span className="text-blue-300 text-[9px] uppercase font-black tracking-[0.2em]">INSTITUTE ERP</span>
           </div>
         </div>
         
@@ -266,9 +366,9 @@ export default function App() {
           <SidebarItem icon="fa-file-invoice-dollar" label="Fees & Payments" active={activeTab === 'fees'} onClick={() => setActiveTab('fees')} />
           <SidebarItem icon="fa-file-alt" label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
           
-          <div className="mt-auto border-t border-blue-800 pt-4 mb-4">
-            <SidebarItem icon="fa-database" label="Backup Database" active={false} onClick={() => { if(confirm('Download local backup?')) backupDB(); }} />
-            <SidebarItem icon="fa-sign-out-alt" label="Logout" active={false} onClick={logout} />
+          <div className="mt-auto border-t border-blue-900/50 pt-4 mb-4">
+            <SidebarItem icon="fa-database" label="System Backup" active={false} onClick={() => { if(confirm('Secure local backup will be downloaded. Proceed?')) backupDB(); }} />
+            <SidebarItem icon="fa-power-off" label="Exit System" active={false} onClick={logout} />
           </div>
         </nav>
       </aside>
@@ -278,26 +378,20 @@ export default function App() {
         {/* Top Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 capitalize">{activeTab}</h1>
-            <p className="text-gray-500 text-sm">Welcome back, {user.name} ({user.role})</p>
+            <h1 className="text-2xl font-bold text-gray-800 capitalize tracking-tight">{activeTab} Overview</h1>
+            <div className="flex items-center gap-2 text-gray-500 text-sm">
+               <span className="font-medium">Welcome, {user.name}</span>
+               <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+               <span className="bg-[#2d5a8e]/10 text-[#2d5a8e] px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">{user.role} ACCESS</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="relative hidden lg:block">
-              <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-              <input 
-                type="text" 
-                placeholder="Quick search student..." 
-                className="pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 w-64 bg-white"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
             <div className="flex items-center gap-3 ml-2 border-l pl-6 border-gray-200">
                <div className="text-right">
-                  <p className="text-xs font-bold text-gray-800">{user.name}</p>
-                  <p className="text-[10px] text-gray-500 uppercase">{user.role}</p>
+                  <p className="text-xs font-black text-[#2d5a8e] uppercase">+91 8509642898</p>
+                  <p className="text-[10px] text-gray-400 font-medium">skillopedia.institute@gmail.com</p>
                </div>
-               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-blue-200 shadow-sm">
+               <div className="w-11 h-11 rounded-full bg-[#2d5a8e] flex items-center justify-center text-white font-bold border-4 border-white shadow-md">
                  {user.name.charAt(0)}
                </div>
             </div>
@@ -308,75 +402,71 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card title="Total Students" value={stats.totalStudents} icon="fa-users" color="bg-blue-600" />
-              <Card title="Active Batches" value={stats.totalBatches} icon="fa-book" color="bg-emerald-600" />
-              <Card title="Fees Collected" value={formatCurrency(stats.totalFeesCollected)} icon="fa-hand-holding-usd" color="bg-amber-600" />
-              <Card title="Teachers" value={db.teachers.length} icon="fa-chalkboard-teacher" color="bg-purple-600" />
+              <Card title="Total Students" value={stats.totalStudents} icon="fa-users" color="bg-[#2d5a8e]" />
+              <Card title="Active Batches" value={stats.totalBatches} icon="fa-book" color="bg-[#9dc84a]" />
+              <Card title="Total Revenue" value={formatCurrency(stats.totalFeesCollected)} icon="fa-coins" color="bg-[#f9a01b]" />
+              <Card title="Expert Faculty" value={db.teachers.length} icon="fa-user-tie" color="bg-purple-600" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                    <i className="fas fa-history text-blue-500"></i> Recent Admissions
+                    <i className="fas fa-user-clock text-blue-500"></i> Latest Admissions
                   </h4>
-                  <button onClick={() => setActiveTab('students')} className="text-blue-600 text-sm font-bold hover:underline">View All</button>
+                  <button onClick={() => setActiveTab('students')} className="text-[#2d5a8e] text-xs font-black uppercase tracking-wider hover:underline">Manage All</button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="text-left bg-gray-50">
+                    <thead className="text-left bg-gray-50/50">
                       <tr>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">ID</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Student</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Course</th>
-                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase">Status</th>
+                        <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Enrollment ID</th>
+                        <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
+                        <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Course Module</th>
+                        <th className="py-3 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Admission Date</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-gray-100">
                       {db.students.slice(-5).reverse().map(s => (
-                        <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-3 px-4 font-mono text-sm text-blue-600">{s.id}</td>
-                          <td className="py-3 px-4 font-medium">{s.name}</td>
-                          <td className="py-3 px-4 text-gray-600">{s.course}</td>
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {s.status}
-                            </span>
-                          </td>
+                        <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="py-4 px-4 font-mono text-sm font-bold text-[#2d5a8e]">{s.id}</td>
+                          <td className="py-4 px-4 font-bold text-gray-700">{s.name}</td>
+                          <td className="py-4 px-4 text-gray-500 text-sm font-medium">{s.course}</td>
+                          <td className="py-4 px-4 text-gray-400 text-xs">{s.admissionDate}</td>
                         </tr>
                       ))}
                       {db.students.length === 0 && (
-                        <tr><td colSpan={4} className="py-8 text-center text-gray-400 italic">No students admitted yet.</td></tr>
+                        <tr><td colSpan={4} className="py-12 text-center text-gray-300 italic font-medium">No student records found.</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                  <i className="fas fa-receipt text-blue-500"></i> Recent Payments
+                  <i className="fas fa-hand-holding-usd text-green-500"></i> Recent Revenue
                 </h4>
                 <div className="space-y-4">
-                  {db.payments.slice(-4).reverse().map(p => {
+                  {db.payments.slice(-5).reverse().map(p => {
                     const student = db.students.find(s => s.id === p.studentId);
                     return (
-                      <div key={p.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer" onClick={() => student && setPrintingPayment({payment: p, student})}>
+                      <div key={p.id} className="flex items-center gap-4 p-4 bg-gray-50/50 rounded-xl hover:bg-white hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-blue-100" onClick={() => student && setPrintingPayment({payment: p, student})}>
                         <div className="w-10 h-10 bg-green-100 text-green-600 flex items-center justify-center rounded-lg shadow-sm">
                           <i className="fas fa-check-circle"></i>
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-bold truncate">{student?.name || 'Unknown'}</p>
-                          <p className="text-[10px] text-gray-500 uppercase">{p.receiptNo} • {p.date}</p>
+                          <p className="text-sm font-bold truncate text-gray-800">{student?.name || 'Deleted Record'}</p>
+                          <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">{p.receiptNo} • {p.date}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-gray-800">{formatCurrency(p.amount)}</p>
+                          <p className="text-sm font-black text-[#2d5a8e]">{formatCurrency(p.amount)}</p>
                         </div>
                       </div>
                     );
                   })}
                    {db.payments.length === 0 && (
-                    <div className="text-center py-8 text-gray-400 italic">No payments recorded.</div>
+                    <div className="text-center py-12 text-gray-300 italic font-medium">No payments received yet.</div>
                   )}
                 </div>
               </div>
@@ -387,178 +477,190 @@ export default function App() {
         {activeTab === 'students' && (
           <div className="animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-              <div className="flex-1 max-w-md relative">
-                 <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-                 <input 
-                    type="text" 
-                    placeholder="Search by name, ID or mobile..." 
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                 />
-              </div>
+              <SearchBar 
+                value={studentSearch} 
+                onChange={setStudentSearch} 
+                placeholder="Search Student by Name, ID, or Phone..." 
+              />
               <button 
                 onClick={openNewAdmission}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center gap-2"
+                className="bg-[#2d5a8e] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg shadow-blue-100 flex items-center gap-3 transition-all"
               >
-                <i className="fas fa-plus"></i> New Admission Form
+                <i className="fas fa-user-plus"></i> New Enrollment Form
               </button>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50/80 border-b">
                   <tr>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Course</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Admission Date</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="p-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Student ID</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Personal Info</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Course Module</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Admission Date</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                    <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Management</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100">
                   {filteredStudents.map(s => (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="p-4 font-mono text-sm font-bold text-blue-600">{s.id}</td>
-                      <td className="p-4">
-                        <div className="font-bold text-gray-800">{s.name}</div>
-                        <div className="text-xs text-gray-500">{s.mobile}</div>
+                    <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-5 font-mono text-sm font-black text-[#2d5a8e]">{s.id}</td>
+                      <td className="p-5">
+                        <div className="font-bold text-gray-800 tracking-tight">{s.name}</div>
+                        <div className="text-xs font-bold text-gray-400"><i className="fas fa-phone-alt mr-1 text-[10px]"></i> {s.mobile}</div>
                       </td>
-                      <td className="p-4 text-gray-600 font-medium">{s.course}</td>
-                      <td className="p-4 text-gray-500">{s.admissionDate}</td>
-                      <td className="p-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      <td className="p-5">
+                        <span className="font-bold text-gray-600 text-sm">{s.course}</span>
+                      </td>
+                      <td className="p-5 text-gray-500 text-sm font-medium">{s.admissionDate}</td>
+                      <td className="p-5">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {s.status}
                         </span>
                       </td>
-                      <td className="p-4 text-right">
-                        <div className="flex justify-end gap-2">
+                      <td className="p-5 text-right">
+                        <div className="flex justify-end gap-3">
                           <button 
                             onClick={() => openEditStudent(s)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                            title="Edit Student"
+                            className="w-9 h-9 flex items-center justify-center text-[#2d5a8e] bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
+                            title="Edit Student Profile"
                           >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setDb(prev => ({
-                                ...prev,
-                                students: prev.students.map(st => st.id === s.id ? { ...st, status: st.status === 'Active' ? 'Inactive' : 'Active' } : st)
-                              }));
-                            }}
-                            className={`p-2 rounded-lg ${s.status === 'Active' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
-                            title={s.status === 'Active' ? 'Deactivate' : 'Activate'}
-                          >
-                            <i className={s.status === 'Active' ? 'fas fa-user-slash' : 'fas fa-user-check'}></i>
+                            <i className="fas fa-user-edit"></i>
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {filteredStudents.length === 0 && (
-                    <tr><td colSpan={6} className="p-12 text-center text-gray-400 italic">No matching students found.</td></tr>
+                    <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-medium italic">No students match your search.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
-        
-        {/* Rest of Tabs... */}
+
         {activeTab === 'teachers' && (
           <div className="animate-in fade-in duration-500">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800">Faculty Management</h3>
+            <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+              <SearchBar 
+                value={teacherSearch} 
+                onChange={setTeacherSearch} 
+                placeholder="Search Teacher by Name or Subject..." 
+              />
               <button 
-                onClick={() => {
-                  const name = prompt('Teacher Name:');
-                  const email = prompt('Email:');
-                  const subjects = prompt('Subjects (comma separated):')?.split(',') || [];
-                  if(name) addTeacher({ name, email, mobile: '0000000000', subjects });
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 flex items-center gap-2"
+                onClick={openNewTeacher}
+                className="bg-[#2d5a8e] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg flex items-center gap-2 transition-all"
               >
-                <i className="fas fa-plus"></i> Add Teacher
+                <i className="fas fa-plus"></i> Recruit New Faculty
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {db.teachers.map(t => (
-                <div key={t.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                   <div className="flex items-center gap-4 mb-4">
-                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl uppercase">
+              {filteredTeachers.map(t => (
+                <div key={t.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative group hover:shadow-xl transition-all duration-300">
+                   <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button onClick={() => openEditTeacher(t)} className="w-9 h-9 bg-blue-50 text-[#2d5a8e] rounded-xl flex items-center justify-center hover:bg-blue-100">
+                       <i className="fas fa-edit"></i>
+                     </button>
+                   </div>
+                   <div className="flex items-center gap-4 mb-5 border-b pb-4 border-gray-50">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2d5a8e] to-[#4299e1] flex items-center justify-center text-white font-black text-2xl shadow-lg">
                         {t.name.charAt(0)}
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-800">{t.name}</h4>
-                        <p className="text-xs text-gray-500 font-mono">{t.id}</p>
+                        <h4 className="font-bold text-gray-800 text-lg tracking-tight">{t.name}</h4>
+                        <p className="text-[10px] text-[#2d5a8e] font-black uppercase tracking-widest">Faculty ID: {t.id}</p>
                       </div>
                    </div>
-                   <div className="space-y-2 mb-4">
-                     <p className="text-sm text-gray-600 flex items-center gap-2"><i className="fas fa-envelope text-gray-400"></i> {t.email}</p>
-                     <p className="text-sm text-gray-600 flex items-center gap-2"><i className="fas fa-phone text-gray-400"></i> {t.mobile}</p>
+                   <div className="space-y-3 mb-5">
+                     <p className="text-sm text-gray-600 flex items-center gap-3"><i className="fas fa-envelope text-gray-300"></i> {t.email}</p>
+                     <p className="text-sm text-gray-600 flex items-center gap-3"><i className="fas fa-phone-alt text-gray-300"></i> {t.mobile}</p>
                    </div>
                    <div className="flex flex-wrap gap-2">
                      {t.subjects.map(s => (
-                       <span key={s} className="px-2 py-1 bg-gray-100 text-gray-600 text-[10px] font-bold rounded uppercase">{s}</span>
+                       <span key={s} className="px-3 py-1 bg-blue-50 text-[#2d5a8e] text-[10px] font-black rounded-lg uppercase tracking-wider border border-blue-100">{s}</span>
                      ))}
                    </div>
                 </div>
               ))}
+              {filteredTeachers.length === 0 && (
+                <div className="col-span-full py-16 text-center text-gray-400 font-medium italic">No teachers match your search.</div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'batches' && (
           <div className="animate-in fade-in duration-500">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800">Active Batches</h3>
+            <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+              <SearchBar 
+                value={batchSearch} 
+                onChange={setBatchSearch} 
+                placeholder="Search Batch by Name, Course or Teacher..." 
+              />
               <button 
-                onClick={() => {
-                  const name = prompt('Batch Name:');
-                  const course = prompt('Course:');
-                  const teacherId = prompt('Teacher ID (e.g., T1):');
-                  const timing = prompt('Timing (e.g., 10 AM - 12 PM):');
-                  if(name && course) addBatch({ name, course, teacherId, timing });
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 flex items-center gap-2"
+                onClick={openNewBatch}
+                className="bg-[#2d5a8e] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg flex items-center gap-2 transition-all"
               >
-                <i className="fas fa-plus"></i> Create Batch
+                <i className="fas fa-layer-group"></i> Create Learning Group
               </button>
             </div>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Batch Name</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Course</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Teacher</th>
-                    <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Timing</th>
-                    <th className="p-4 text-right text-xs font-bold text-gray-500 uppercase">Students</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Batch Name</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Course Module</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Faculty Mentor</th>
+                    <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Schedule (Timing)</th>
+                    <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Count</th>
+                    <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Options</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
-                  {db.batches.map(b => (
-                    <tr key={b.id} className="hover:bg-gray-50">
-                      <td className="p-4 font-bold text-gray-800">{b.name}</td>
-                      <td className="p-4 text-gray-600">{b.course}</td>
-                      <td className="p-4 text-blue-600 font-medium">{db.teachers.find(t => t.id === b.teacherId)?.name || 'Unassigned'}</td>
-                      <td className="p-4 text-gray-500">{b.timing}</td>
-                      <td className="p-4 text-right font-bold text-gray-800">{db.students.filter(s => s.batchId === b.id).length}</td>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredBatches.map(b => (
+                    <tr key={b.id} className="hover:bg-gray-50/50">
+                      <td className="p-5 font-black text-gray-800">{b.name}</td>
+                      <td className="p-5 text-gray-600 font-medium">{b.course}</td>
+                      <td className="p-5 font-bold text-[#2d5a8e]">{db.teachers.find(t => t.id === b.teacherId)?.name || 'Unassigned'}</td>
+                      <td className="p-5">
+                        <div className="flex items-center gap-2 text-[#9dc84a] font-black text-sm">
+                          <i className="fas fa-clock"></i>
+                          {b.timing}
+                        </div>
+                      </td>
+                      <td className="p-5 text-center">
+                        <span className="bg-blue-50 text-[#2d5a8e] font-black px-3 py-1 rounded-lg text-sm">{db.students.filter(s => s.batchId === b.id).length}</span>
+                      </td>
+                      <td className="p-5 text-right">
+                        <button 
+                          onClick={() => openEditBatch(b)} 
+                          className="text-[#2d5a8e] hover:bg-blue-50 p-2.5 rounded-xl transition-all flex items-center gap-2 ml-auto"
+                          title="Reschedule / Edit Batch"
+                        >
+                          <i className="fas fa-calendar-alt"></i>
+                          <span className="text-xs font-black uppercase">Reschedule</span>
+                        </button>
+                      </td>
                     </tr>
                   ))}
+                  {filteredBatches.length === 0 && (
+                    <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-medium italic">No batches match your search.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
+        {/* --- Fees, Attendance, Reports tabs stay as refined in last turn --- */}
         {activeTab === 'fees' && (
           <div className="animate-in fade-in duration-500">
-             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8">
-               <h4 className="font-black text-gray-800 mb-6 uppercase tracking-wider text-sm">New Fee Payment</h4>
-               <form className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end" onSubmit={(e) => {
+             <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm mb-8 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#f9a01b]"></div>
+               <h4 className="font-black text-gray-800 mb-8 uppercase tracking-[0.2em] text-xs">Authorize New Fee Payment</h4>
+               <form className="grid grid-cols-1 md:grid-cols-4 gap-8 items-end" onSubmit={(e) => {
                  e.preventDefault();
                  const fd = new FormData(e.currentTarget);
                  const data = {
@@ -573,64 +675,60 @@ export default function App() {
                  (e.target as HTMLFormElement).reset();
                }}>
                  <div>
-                   <label className="block text-xs font-bold text-gray-500 mb-2">STUDENT</label>
-                   <select name="studentId" required className="w-full p-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                     <option value="">Select Student</option>
+                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Select Enrolled Student</label>
+                   <select name="studentId" required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] font-bold text-gray-700">
+                     <option value="">Choose Student...</option>
                      {db.students.filter(s => s.status === 'Active').map(s => (
                        <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
                      ))}
                    </select>
                  </div>
                  <div>
-                   <label className="block text-xs font-bold text-gray-500 mb-2">AMOUNT (INR)</label>
-                   <input name="amount" type="number" required placeholder="0.00" className="w-full p-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Amount to Pay (INR)</label>
+                   <input name="amount" type="number" required placeholder="0.00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] font-black" />
                  </div>
                  <div>
-                   <label className="block text-xs font-bold text-gray-500 mb-2">PAYMENT MODE</label>
-                   <select name="mode" className="w-full p-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Transaction Mode</label>
+                   <select name="mode" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] font-bold">
                      {Object.values(PaymentMode).map(m => <option key={m} value={m}>{m}</option>)}
                    </select>
                  </div>
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-2">FROM PERIOD</label>
-                    <input name="periodFrom" type="month" required className="w-full p-2.5 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-500" />
-                 </div>
-                 <button type="submit" className="bg-blue-600 text-white p-2.5 rounded-lg font-bold hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">
-                   <i className="fas fa-receipt"></i> Pay & Print Receipt
+                 <button type="submit" className="bg-[#2d5a8e] text-white py-4 rounded-xl font-bold hover:bg-[#1e3c5f] shadow-lg flex items-center justify-center gap-3 transition-all">
+                   <i className="fas fa-file-invoice-dollar text-xl"></i> Authorize & Print
                  </button>
                </form>
              </div>
 
-             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-gray-50/80 border-b">
                     <tr>
-                      <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Receipt #</th>
-                      <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Student</th>
-                      <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
-                      <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Amount</th>
-                      <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase">Mode</th>
-                      <th className="p-4 text-right text-xs font-bold text-gray-500 uppercase">Action</th>
+                      <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Receipt Serial</th>
+                      <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Information</th>
+                      <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                      <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Authorized Amount</th>
+                      <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Channel</th>
+                      <th className="p-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Management</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-gray-100">
                     {db.payments.slice().reverse().map(p => {
                       const st = db.students.find(s => s.id === p.studentId);
                       return (
-                        <tr key={p.id} className="hover:bg-gray-50">
-                          <td className="p-4 font-bold text-gray-700">{p.receiptNo}</td>
-                          <td className="p-4 font-medium">{st?.name || 'N/A'}</td>
-                          <td className="p-4 text-gray-500">{p.date}</td>
-                          <td className="p-4 font-black text-blue-700">{formatCurrency(p.amount)}</td>
-                          <td className="p-4">
-                            <span className="text-[10px] font-bold bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{p.mode}</span>
+                        <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="p-5 font-black text-gray-700 tracking-tighter">{p.receiptNo}</td>
+                          <td className="p-5 font-bold text-gray-800">{st?.name || 'Archived Student'}</td>
+                          <td className="p-5 text-gray-500 font-medium text-sm">{p.date}</td>
+                          <td className="p-5 font-black text-[#2d5a8e] text-lg">{formatCurrency(p.amount)}</td>
+                          <td className="p-5">
+                            <span className="text-[10px] font-black bg-gray-100 px-3 py-1 rounded-lg border border-gray-200 uppercase tracking-wider text-gray-600">{p.mode}</span>
                           </td>
-                          <td className="p-4 text-right">
+                          <td className="p-5 text-right">
                             <button 
                               onClick={() => st && setPrintingPayment({payment: p, student: st})}
-                              className="text-blue-600 hover:underline font-bold text-sm"
+                              className="text-[#2d5a8e] bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 font-bold text-xs transition-all shadow-sm"
                             >
-                              <i className="fas fa-print mr-1"></i> Reprint
+                              <i className="fas fa-print mr-2"></i> Reprint
                             </button>
                           </td>
                         </tr>
@@ -644,39 +742,40 @@ export default function App() {
 
         {activeTab === 'attendance' && (
            <div className="animate-in fade-in duration-500">
-             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8">
-               <h4 className="font-black text-gray-800 mb-6 uppercase tracking-wider text-sm">Mark Daily Attendance</h4>
-               <div className="flex flex-col md:flex-row gap-6 mb-6">
+             <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm mb-8 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1.5 h-full bg-[#9dc84a]"></div>
+               <h4 className="font-black text-gray-800 mb-8 uppercase tracking-[0.2em] text-xs">Verify Daily Class Attendance</h4>
+               <div className="flex flex-col md:flex-row gap-8 mb-8">
                  <div className="flex-1">
-                   <label className="block text-xs font-bold text-gray-500 mb-2">SELECT BATCH</label>
-                   <select className="w-full p-2.5 bg-gray-50 border rounded-lg" id="batchSelect">
+                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Active Batch</label>
+                   <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] font-bold" id="batchSelect">
                      {db.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                    </select>
                  </div>
                  <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-500 mb-2">DATE</label>
-                    <input type="date" className="w-full p-2.5 bg-gray-50 border rounded-lg" defaultValue={new Date().toISOString().split('T')[0]} id="attDate" />
+                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Current Session Date</label>
+                    <input type="date" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#2d5a8e] font-bold" defaultValue={new Date().toISOString().split('T')[0]} id="attDate" />
                  </div>
                </div>
                
-               <div className="border rounded-lg overflow-hidden mb-6">
+               <div className="border border-gray-100 rounded-2xl overflow-hidden mb-8 shadow-sm">
                  <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="p-3 text-left text-xs font-bold">Student Name</th>
-                        <th className="p-3 text-center text-xs font-bold">Present</th>
-                        <th className="p-3 text-center text-xs font-bold">Absent</th>
+                        <th className="p-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Student Information</th>
+                        <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Mark Present</th>
+                        <th className="p-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Mark Absent</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y" id="attTable">
+                    <tbody className="divide-y divide-gray-50" id="attTable">
                       {db.students.filter(s => s.status === 'Active').map(s => (
-                        <tr key={s.id}>
-                          <td className="p-3 text-sm font-medium">{s.name}</td>
-                          <td className="p-3 text-center">
-                            <input type="radio" name={`att-${s.id}`} value="Present" defaultChecked className="w-4 h-4 text-blue-600" />
+                        <tr key={s.id} className="hover:bg-blue-50/20 transition-colors">
+                          <td className="p-4 text-sm font-bold text-gray-700 tracking-tight">{s.name}</td>
+                          <td className="p-4 text-center">
+                            <input type="radio" name={`att-${s.id}`} value="Present" defaultChecked className="w-5 h-5 accent-green-600" />
                           </td>
-                          <td className="p-3 text-center">
-                            <input type="radio" name={`att-${s.id}`} value="Absent" className="w-4 h-4 text-red-600" />
+                          <td className="p-4 text-center">
+                            <input type="radio" name={`att-${s.id}`} value="Absent" className="w-5 h-5 accent-red-600" />
                           </td>
                         </tr>
                       ))}
@@ -697,9 +796,9 @@ export default function App() {
                   });
                   markAttendance(date, batchId, records);
                 }}
-                className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 shadow-lg flex items-center justify-center gap-2"
+                className="w-full bg-[#9dc84a] text-white py-4 rounded-xl font-bold hover:opacity-90 shadow-lg shadow-green-100 flex items-center justify-center gap-3 transition-all"
                >
-                 <i className="fas fa-check-double"></i> Save Attendance Records
+                 <i className="fas fa-check-double text-xl"></i> Commit Attendance Log
                </button>
              </div>
            </div>
@@ -707,61 +806,61 @@ export default function App() {
 
         {activeTab === 'reports' && (
           <div className="animate-in fade-in duration-500 space-y-6">
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center">
-                 <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+               <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm text-center group hover:shadow-2xl transition-all duration-500">
+                 <div className="w-16 h-16 bg-blue-50 text-[#2d5a8e] rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl shadow-inner group-hover:scale-110 transition-transform">
                    <i className="fas fa-file-csv"></i>
                  </div>
-                 <h5 className="font-bold text-gray-800 mb-2">Student Directory</h5>
-                 <p className="text-xs text-gray-500 mb-4">Export all active student profiles and details.</p>
+                 <h5 className="font-bold text-gray-800 mb-2 text-lg">Student Directory</h5>
+                 <p className="text-xs text-gray-500 mb-6 font-medium">Export master student database for external analysis.</p>
                  <button 
                     onClick={() => {
                       const csv = "ID,Name,Mobile,Course,Status\n" + db.students.map(s => `${s.id},${s.name},${s.mobile},${s.course},${s.status}`).join("\n");
                       const blob = new Blob([csv], { type: 'text/csv' });
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a'); a.href = url; a.download = 'students.csv'; a.click();
+                      const a = document.createElement('a'); a.href = url; a.download = 'skillopedia_students.csv'; a.click();
                     }}
-                    className="w-full py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700"
+                    className="w-full py-3 bg-[#2d5a8e] text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-[#1e3c5f] transition-all shadow-lg shadow-blue-50"
                  >
-                   Download CSV
+                   Download Secure CSV
                  </button>
                </div>
 
-               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center">
-                 <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
-                   <i className="fas fa-file-invoice"></i>
+               <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm text-center group hover:shadow-2xl transition-all duration-500">
+                 <div className="w-16 h-16 bg-green-50 text-[#9dc84a] rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl shadow-inner group-hover:scale-110 transition-transform">
+                   <i className="fas fa-coins"></i>
                  </div>
-                 <h5 className="font-bold text-gray-800 mb-2">Revenue Report</h5>
-                 <p className="text-xs text-gray-500 mb-4">Export full payment ledger for accounts.</p>
+                 <h5 className="font-bold text-gray-800 mb-2 text-lg">Revenue Ledger</h5>
+                 <p className="text-xs text-gray-500 mb-6 font-medium">Official financial audit of all verified transactions.</p>
                  <button 
                     onClick={() => {
                       const csv = "ReceiptNo,Student,Date,Amount,Mode\n" + db.payments.map(p => `${p.receiptNo},${db.students.find(s => s.id === p.studentId)?.name},${p.date},${p.amount},${p.mode}`).join("\n");
                       const blob = new Blob([csv], { type: 'text/csv' });
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a'); a.href = url; a.download = 'revenue.csv'; a.click();
+                      const a = document.createElement('a'); a.href = url; a.download = 'skillopedia_revenue.csv'; a.click();
                     }}
-                    className="w-full py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700"
+                    className="w-full py-3 bg-[#9dc84a] text-white text-xs font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all shadow-lg shadow-green-50"
                  >
-                   Download CSV
+                   Download Audit Data
                  </button>
                </div>
 
-               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center">
-                 <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
-                   <i className="fas fa-calendar-alt"></i>
+               <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm text-center group hover:shadow-2xl transition-all duration-500">
+                 <div className="w-16 h-16 bg-orange-50 text-[#f9a01b] rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl shadow-inner group-hover:scale-110 transition-transform">
+                   <i className="fas fa-calendar-check"></i>
                  </div>
-                 <h5 className="font-bold text-gray-800 mb-2">Attendance Summary</h5>
-                 <p className="text-xs text-gray-500 mb-4">Monthly present/absent counts per student.</p>
+                 <h5 className="font-bold text-gray-800 mb-2 text-lg">Attendance Records</h5>
+                 <p className="text-xs text-gray-500 mb-6 font-medium">Comprehensive student attendance historical log.</p>
                  <button 
                     onClick={() => {
                       const csv = "Date,Batch,StudentID,Status\n" + db.attendance.map(a => `${a.date},${a.batchId},${a.studentId},${a.status}`).join("\n");
                       const blob = new Blob([csv], { type: 'text/csv' });
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a'); a.href = url; a.download = 'attendance_history.csv'; a.click();
+                      const a = document.createElement('a'); a.href = url; a.download = 'skillopedia_attendance.csv'; a.click();
                     }}
-                    className="w-full py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700"
+                    className="w-full py-3 bg-[#f9a01b] text-white text-xs font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all shadow-lg shadow-orange-50"
                  >
-                   Download CSV
+                   Download Log History
                  </button>
                </div>
              </div>
@@ -770,10 +869,13 @@ export default function App() {
       </main>
       
       {/* Floating Status Bar */}
-      <footer className="fixed bottom-0 right-0 p-2 text-[10px] text-gray-400 no-print flex items-center gap-2 pointer-events-none">
-        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> DB LOCAL (v1.0.4)</span>
-        <span>•</span>
-        <span>LICENSED ERP VERSION</span>
+      <footer className="fixed bottom-0 right-0 p-3 text-[9px] text-gray-400 no-print flex items-center gap-3 pointer-events-none backdrop-blur-md bg-white/50 rounded-tl-xl border-l border-t border-gray-200 shadow-xl">
+        <span className="flex items-center gap-2 font-bold tracking-widest">
+           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 
+           SKILLOPEDIA LOCAL SERVER ACTIVE
+        </span>
+        <span className="text-gray-300">|</span>
+        <span className="font-black uppercase tracking-tighter">v1.0.4 PRODUCTION BUILD</span>
       </footer>
     </div>
   );
